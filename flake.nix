@@ -4,6 +4,7 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
   outputs = {
+    self,
     flake-utils,
     nixpkgs,
     ...
@@ -20,6 +21,7 @@
           ];
           shellHook = ''
             export CC="zig c++"
+            export CPLUS_INCLUDE_PATH="${self.system}/zig-out/include"
           '';
         };
     });

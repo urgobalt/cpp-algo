@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) !void {
 
     try cpp_entries.add_library(.{
         .name = "testing",
-        .entry_path = b.path("testing/lib.cc"),
+        .entry_path = b.path("testing/testing.cc"),
         .root_header_files = "testing",
     });
 
