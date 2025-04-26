@@ -21,7 +21,7 @@
           ];
           shellHook = ''
             export CC="zig c++"
-            export CPLUS_INCLUDE_PATH="${self.system}/zig-out/include"
+            export CPLUS_INCLUDE_PATH="./zig-out/include"
           '';
         };
     });
