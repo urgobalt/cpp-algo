@@ -9,24 +9,14 @@ pub fn build(b: *std.Build) !void {
     var cpp_entries = CppEntries.init(b, .{ .target = target, .optimize = optimize });
     defer cpp_entries.deinit();
 
-    const testing = testing: {
-        const testing_module = b.addModule("testing", .{
-            .root_source_file = b.path("testing/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        });
+    const testing = cpp_entries.install_zig_library("testing", .{
+        .root_source_file = b.path("testing/main.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
-        const lib = b.addStaticLibrary(.{
-            .name = "testing",
-            .root_module = testing_module,
-        });
+    testing.install_headers() catch @panic("IO error");
 
-        _ = lib.getEmittedH();
-
-        break :testing lib;
-    };
-
-    cpp_entries.add_library(testing);
     cpp_entries.add_entry("a1", b.path("src/a1.cc"));
     cpp_entries.add_entry("a2", b.path("src/a2.cc"));
 

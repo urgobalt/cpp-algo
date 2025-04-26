@@ -6,64 +6,8 @@ const ArrayList = std.ArrayList;
 b: *std.Build,
 target: std.Build.ResolvedTarget,
 optimize: std.builtin.OptimizeMode,
-libraries: ArrayList(CppLibrary),
+libraries: ArrayList(*CppLibrary),
 entries: ArrayList(*std.Build.Step.Compile),
-
-const default_header_extensions = [_][]const u8{ ".h", ".hpp" };
-
-const CppLibraryType = enum {
-    obj,
-    cpp,
-    zig,
-};
-
-pub fn CppLibrary(self: CppEntries, library_type: CppLibraryType) type {
-    struct {
-        step: *std.Build.Step.Compile,
-        type: CppLibraryType = library_type,
-
-        const HeaderOptions = switch (library_type) {
-            .cpp | .obj => struct {
-                root_directory: []const u8,
-                extensions: ?[]const []const u8,
-            },
-            .zig => struct {},
-        };
-
-        pub fn install_headers(library: @This(), options: HeaderOptions) void {
-            comptime switch (library_type) {
-                .cpp | .obj => install_headers_in_dir(self.b, options),
-                .zig => {
-                    _ = library.step.getEmittedH();
-                },
-            };
-        }
-
-        fn install_headers_in_dir(b: *std.Build, options: HeaderOptions) void {
-            const header_extensions = options.extensions orelse &default_header_extensions;
-
-            var dir = try std.fs.cwd().openDir(options.root_directory, .{ .iterate = true });
-            var walker = dir.walk(b.allocator) catch @panic("OOM");
-            defer walker.deinit();
-
-            while (try walker.next()) |entry| {
-                const ext = std.fs.path.extension(entry.basename);
-                const include_file = for (header_extensions) |rext| {
-                    if (std.mem.eql(u8, ext, rext)) break true;
-                } else false;
-
-                const path = path: {
-                    const parts = [_][]const u8{ options.root_directory, entry.path };
-                    break :path std.fs.path.join(b.allocator, &parts) catch @panic("OOM");
-                };
-
-                if (include_file) {
-                    b.installFile(path, std.mem.join(self.b.allocator, "/", &[_][]const u8{ "include", entry.basename }) catch @panic("OOM"));
-                }
-            }
-        }
-    };
-}
 
 const cflags = [_][]const u8{
     "-pedantic-errors",
@@ -81,7 +25,7 @@ pub fn init(
     b: *std.Build,
     options: CppEntriesOptions,
 ) CppEntries {
-    const libraries = ArrayList(CppLibrary).init(b.allocator);
+    const libraries = ArrayList(*CppLibrary).init(b.allocator);
     const entries = ArrayList(*std.Build.Step.Compile).init(b.allocator);
 
     return .{
@@ -94,54 +38,11 @@ pub fn init(
 }
 
 pub fn deinit(self: CppEntries) void {
+    for (self.libraries.items) |lib| {
+        self.b.allocator.destroy(lib);
+    }
     self.libraries.deinit();
     self.entries.deinit();
-}
-
-const CppLibraryOptions = struct {
-    name: []const u8,
-    entry_path: std.Build.LazyPath,
-    root_header_files: []const u8,
-};
-
-pub fn add_library(self: *CppEntries, library: *std.Build.Step.Compile) void {
-    const testing_module = self.b.addModule("testing", .{
-        .root_source_file = self.b.path("testing/main.zig"),
-        .target = self.target,
-        .optimize = self.optimize,
-    });
-
-    const lib = self.b.addStaticLibrary(.{
-        .name = "testing",
-        .root_module = testing_module,
-    });
-
-    _ = lib.getEmittedH();
-
-    self.libraries.append(library) catch @panic("OOM");
-}
-
-pub fn add_cpp_library_step(self: *CppEntries, lib_opts: CppLibraryOptions) !void {
-    const root_module = self.b.createModule(.{
-        .target = self.target,
-        .optimize = self.optimize,
-        .link_libcpp = true,
-        .pic = true,
-    });
-
-    root_module.addCSourceFile(.{
-        .file = lib_opts.entry_path,
-        .flags = &cflags,
-    });
-
-    const library = self.b.addLibrary(.{
-        .name = lib_opts.name,
-        .root_module = root_module,
-    });
-
-    self.b.installArtifact(library);
-
-    self.libraries.append(library) catch @panic("OOM");
 }
 
 pub fn add_entry(self: *CppEntries, name: []const u8, file: std.Build.LazyPath) void {
@@ -161,10 +62,117 @@ pub fn add_entry(self: *CppEntries, name: []const u8, file: std.Build.LazyPath) 
     entry.linkLibCpp();
 
     for (self.libraries.items) |library| {
-        entry.linkLibrary(library);
+        entry.linkLibrary(library.step);
     }
 
     self.b.installArtifact(entry);
 
     self.entries.append(entry) catch @panic("OOM");
 }
+
+pub fn install_zig_library(self: *CppEntries, name: []const u8, options: std.Build.Module.CreateOptions) *CppLibrary {
+    const module = self.b.createModule(options);
+
+    const library = self.b.addLibrary(.{
+        .name = name,
+        .root_module = module,
+    });
+
+    self.b.installArtifact(library);
+
+    const wrapper = self.b.allocator.create(CppLibrary) catch @panic("OOM");
+    wrapper.* = CppLibrary{
+        .step = library,
+        .type = .zig,
+    };
+    self.libraries.append(wrapper) catch @panic("OOM");
+    return wrapper;
+}
+
+pub fn install_cpp_library(self: *CppEntries, name: []const u8, file: std.Build.LazyPath) *CppLibrary {
+    const root_module = self.b.createModule(.{
+        .target = self.target,
+        .optimize = self.optimize,
+        .link_libcpp = true,
+        .pic = true,
+    });
+
+    root_module.addCSourceFile(.{
+        .file = file,
+        .flags = &cflags,
+    });
+
+    const library = self.b.addLibrary(.{
+        .name = name,
+        .root_module = root_module,
+    });
+
+    self.b.installArtifact(library);
+
+    const wrapper = self.b.allocator.create(CppLibrary) catch @panic("OOM");
+    wrapper.* = CppLibrary{
+        .step = library,
+        .type = .cpp,
+    };
+    self.libraries.append(wrapper) catch @panic("OOM");
+    return wrapper;
+}
+
+const default_header_extensions = [_][]const u8{ ".h", ".hpp" };
+
+const CppLibrary = struct {
+    step: *std.Build.Step.Compile,
+    type: CppLibraryType,
+    options: ?HeaderOptions = null,
+
+    const HeaderOptions = struct {
+        root_directory: []const u8,
+        extensions: ?[]const []const u8,
+        build: *std.Build,
+    };
+
+    const CppLibraryType = enum {
+        obj,
+        cpp,
+        zig,
+    };
+
+    pub fn configure(self: *CppLibrary, options: HeaderOptions) void {
+        self.options = options;
+    }
+
+    pub fn install_headers(self: *CppLibrary) !void {
+        switch (self.type) {
+            .cpp, .obj => {
+                if (self.options == null) {
+                    @panic("Please run `configure` before running `install_headers`");
+                }
+                const options = self.options.?;
+                const header_extensions = options.extensions orelse &default_header_extensions;
+
+                var dir = try std.fs.cwd().openDir(options.root_directory, .{ .iterate = true });
+                var walker = dir.walk(options.build.allocator) catch @panic("OOM");
+                defer walker.deinit();
+
+                while (try walker.next()) |entry| {
+                    const ext = std.fs.path.extension(entry.basename);
+                    const include_file = for (header_extensions) |rext| {
+                        if (std.mem.eql(u8, ext, rext)) break true;
+                    } else false;
+
+                    const path = path: {
+                        const parts = [_][]const u8{ options.root_directory, entry.path };
+                        break :path std.fs.path.join(options.build.allocator, &parts) catch @panic("OOM");
+                    };
+
+                    if (include_file) {
+                        options.build.installFile(path, std.mem.join(options.build.allocator, "/", &[_][]const u8{ "include", entry.basename }) catch @panic("OOM"));
+                    }
+                }
+            },
+            .zig => {
+                _ = self.step.getEmittedH();
+            },
+        }
+    }
+};
