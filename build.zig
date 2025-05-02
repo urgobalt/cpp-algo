@@ -1,33 +1,89 @@
 const std = @import("std");
 const ArrayList = std.ArrayList;
-const CppEntries = @import("./cpp_entries.zig");
+const Compile = std.Build.Step.Compile;
 
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    var cpp_entries = CppEntries.init(b, .{ .target = target, .optimize = optimize });
-    defer cpp_entries.deinit();
+    const cpp_binaries = CppBinaries.init(.{ .build = b, .target = target, .optimize = optimize });
 
-    const testing = cpp_entries.install_zig_library("testing", .{
-        .root_source_file = b.path("testing/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    const testing_lib = testing_lib: {
+        const module = b.createModule(.{
+            .root_source_file = b.path("testing/main.zig"),
+            .optimize = optimize,
+            .target = target,
+        });
 
-    testing.install_headers() catch @panic("IO error");
+        const lib = b.addLibrary(.{
+            .name = "testing",
+            .root_module = module,
+            .linkage = .static,
+        });
 
-    cpp_entries.add_entry("a1", b.path("src/a1.cc"));
-    cpp_entries.add_entry("a2", b.path("src/a2.cc"));
+        lib.installHeader(b.path("testing/testing.h"), "testing");
 
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(b.getInstallStep());
+        b.installArtifact(lib);
 
-    for (cpp_entries.entries.items) |entry| {
-        const run_cmd = b.addRunArtifact(entry);
-        if (b.args) |args| {
-            run_cmd.addArgs(args);
-        }
-        run_step.dependOn(&run_cmd.step);
-    }
+        break :testing_lib lib;
+    };
+
+    const a1 = cpp_binaries.create_cpp_exe("a1", b.path("./src/a1.cc"));
+    const b2 = cpp_binaries.create_cpp_exe("b2", b.path("./src/b2.cc"));
+    b2.linkLibrary(testing_lib);
+    b2.installLibraryHeaders(testing_lib);
+    b2.addIncludePath(b.path("zig-out/include"));
+
+    const run = b.step("run", "Run all the binaries built");
+    run.dependOn(&a1.step);
+    run.dependOn(&b2.step);
 }
+
+const CppBinaries = struct {
+    build: *std.Build,
+    optimize: std.builtin.OptimizeMode,
+    target: std.Build.ResolvedTarget,
+
+    pub fn init(options: struct {
+        build: *std.Build,
+        target: std.Build.ResolvedTarget,
+        optimize: std.builtin.OptimizeMode,
+    }) @This() {
+        return .{
+            .build = options.build,
+            .optimize = options.optimize,
+            .target = options.target,
+        };
+    }
+
+    const cflags = [_][]const u8{
+        "-pedantic-errors",
+        "-Wc++11-extensions",
+        "-std=c++17",
+        "-g",
+    };
+
+    pub fn create_cpp_exe(self: @This(), name: []const u8, root_source_file: std.Build.LazyPath) *Compile {
+        const module = self.build.createModule(.{
+            .root_source_file = null,
+            .optimize = self.optimize,
+            .target = self.target,
+            .link_libcpp = true,
+        });
+
+        module.addCSourceFile(.{
+            .file = root_source_file,
+            .flags = &cflags,
+            .language = .cpp,
+        });
+
+        const exe = self.build.addExecutable(.{
+            .name = name,
+            .root_module = module,
+        });
+
+        self.build.installArtifact(exe);
+
+        return exe;
+    }
+};
