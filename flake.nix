@@ -16,12 +16,12 @@
         mkShell {
           packages = with pkgs; [
             zig
-            clang
             clang-tools
             zls
           ];
           shellHook = ''
-            export CC="clang++"
+            export CC="zig c++"
+            export CPLUS_INCLUDE_PATH="$(jj workspace root)/zig-out/include/:$CPLUS_INCLUDE_PATH"
           '';
         };
     });

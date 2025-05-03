@@ -1,3 +1,5 @@
-#include <iostream>
+#include <testing>
 
-int main() {}
+int main() {
+  test_file();
+}
