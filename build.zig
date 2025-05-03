@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) !void {
             .root_source_file = b.path("testing/main.zig"),
             .optimize = optimize,
             .target = target,
+            .link_libc = true,
         });
 
         const lib = b.addLibrary(.{
@@ -35,8 +36,8 @@ pub fn build(b: *std.Build) !void {
     b2.addIncludePath(b.path("zig-out/include"));
 
     const run = b.step("run", "Run all the binaries built");
-    run.dependOn(&a1.step);
-    run.dependOn(&b2.step);
+    run.dependOn(&b.addRunArtifact(a1).step);
+    run.dependOn(&b.addRunArtifact(b2).step);
 }
 
 const CppBinaries = struct {
