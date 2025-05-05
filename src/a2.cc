@@ -81,4 +81,4 @@ void QuicksortHoareImprovedMedian3(T elements[], int nrOfElements) {}
 template <class T> void Heapsort(T elements[], int nrOfElements) {}
 
 #endif
-int main() { std::cout << "a2" << std::endl; }
+int main() {}

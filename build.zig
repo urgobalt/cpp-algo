@@ -8,6 +8,8 @@ pub fn build(b: *std.Build) !void {
 
     const cpp_binaries = CppBinaries.init(.{ .build = b, .target = target, .optimize = optimize });
 
+    const header_file = b.addInstallFileWithDir(b.path("testing/testing.h"), .header, "testing");
+
     const testing_lib = testing_lib: {
         const module = b.createModule(.{
             .root_source_file = b.path("testing/main.zig"),
@@ -24,7 +26,7 @@ pub fn build(b: *std.Build) !void {
             .linkage = .static,
         });
 
-        lib.installHeader(b.path("testing/testing.h"), "testing");
+        lib.step.dependOn(&header_file.step);
         b.installArtifact(lib);
 
         break :testing_lib lib;
@@ -33,7 +35,7 @@ pub fn build(b: *std.Build) !void {
     const a1 = cpp_binaries.create_cpp_exe("a1", b.path("./src/a1.cc"));
     const b2 = cpp_binaries.create_cpp_exe("b2", b.path("./src/b2.cc"));
     b2.linkLibrary(testing_lib);
-    b2.installLibraryHeaders(testing_lib);
+    b2.step.dependOn(&header_file.step);
     b2.addIncludePath(b.path("zig-out/include"));
 
     const run = b.step("run", "Run all the binaries built");

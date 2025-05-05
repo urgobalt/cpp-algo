@@ -1,6 +1,5 @@
 #include <cinttypes>
 #include <cstring>
-#include <iostream>
 #ifndef A1_HPP
 #define A1_HPP
 #include <algorithm> // Included for use of std::swap()
@@ -46,7 +45,6 @@ template <class T> int BinarySearch(T elements[], int nrOfElements, T element) {
   int start = 0;
   int stop = nrOfElements - 1;
   while (start <= stop) {
-    std::cout << start << "->" << stop << std::endl;
     int center = (start + stop) / 2;
     if (elements[center] == element) {
       return center;
@@ -93,7 +91,6 @@ int BinarySearchRecursive(T elements[], int nrOfElements, T element) {
 template <class T> void BinaryInsertionsort(T elements[], int nrOfElements) {
   for (int i = 1; i < nrOfElements; i++) {
     T element = elements[i];
-    std::cout << "e:" << element << std::endl;
     int placement = 0;
     int start = 0;
     int stop = i - 1;
@@ -107,7 +104,6 @@ template <class T> void BinaryInsertionsort(T elements[], int nrOfElements) {
         placement = center;
         break;
       }
-      std::cout << start << "->" << stop << std::endl;
 
       if (elements[center] < element) {
         start = center + 1;
@@ -115,7 +111,6 @@ template <class T> void BinaryInsertionsort(T elements[], int nrOfElements) {
         stop = center - 1;
       }
     }
-    std::cout << "p:" << placement << std::endl;
     for (int j = placement; j < i; j++) {
       elements[j + 1] = elements[j];
     }
@@ -124,21 +119,11 @@ template <class T> void BinaryInsertionsort(T elements[], int nrOfElements) {
 }
 #endif
 
-void printArray(const int arr[], size_t size) {
-  for (size_t i = 0; i < size; ++i) {
-    std::cout << arr[i] << (i == size - 1 ? "" : " ");
-  }
-  std::cout << std::endl;
-}
 
 int main() {
   const int size = 7;
   int arr[size] = {4, 6, 5, 4, 3, 2, 1};
   int idxes[size] = {0, 1, 2, 3, 4, 5, 6};
 
-  printArray(arr, size);
-  printArray(idxes, size);
-
   BinaryInsertionsort(arr, size);
-  printArray(arr, size);
 }
