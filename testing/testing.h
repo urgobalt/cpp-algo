@@ -1,3 +1,4 @@
+
 #ifndef TESTING_H
 #define TESTING_H
 
@@ -13,34 +14,35 @@ typedef struct {
   int order;
 } CTrackedItem;
 
-typedef enum {
+enum testingResultCode {
   adt_RESULT_SUCCESS = 0,
   adt_RESULT_ERROR_NULL_PTR = -1,
   adt_RESULT_ERROR_EMPTY = -2,
   adt_RESULT_ERROR_ALLOC = -3,
   adt_RESULT_ERROR_INVALID_HANDLE = -5,
   adt_RESULT_ERROR_OTHER = -4
-} TestingResultCode;
+};
 
 typedef void *ADTHandle;
 typedef void *TrackedItemHandle;
 
-typedef struct {
-  TestingResultCode (*insert)(ADTHandle handle, CTrackedItem value);
-  TestingResultCode (*remove)(ADTHandle handle);
-  TestingResultCode (*peek)(ADTHandle handle);
-  TestingResultCode (*create)(ADTHandle *handle_out); // allways nullptr otherwise unsafe
-  TestingResultCode (*destroy)(ADTHandle handle);
-} adtOperations;
+struct adtOperations {
+  testingResultCode (*insert)(ADTHandle handle, CTrackedItem value);
+  TrackedItemHandle (*remove)(ADTHandle handle);
+  TrackedItemHandle* (*peek)(ADTHandle handle);
+  testingResultCode (*create)(
+      ADTHandle *handle_out); // allways nullptr otherwise unsafe
+  testingResultCode (*destroy)(ADTHandle handle);
+};
 
-TestingResultCode create_tracked_item_default(TrackedItemHandle *handle_out);
+testingResultCode create_tracked_item_default(TrackedItemHandle *handle_out);
 
-TestingResultCode create_tracked_item_value(int value, int order,
+testingResultCode create_tracked_item_value(int value, int order,
                                             TrackedItemHandle *handle_out);
 
-TestingResultCode destroy_tracked_item(TrackedItemHandle handle);
+testingResultCode destroy_tracked_item(TrackedItemHandle handle);
 
-TestingResultCode get_tracked_item_data(TrackedItemHandle handle,
+testingResultCode get_tracked_item_data(TrackedItemHandle handle,
                                         CTrackedItem *item_out);
 void tracked_item_notify_default_construct(void);
 
@@ -76,7 +78,6 @@ void tracked_item_notify_compare_gte(void);
 #endif
 
 #endif
-
 
 #ifdef __cplusplus
 #ifndef TESTING_HPP

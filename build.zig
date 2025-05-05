@@ -16,6 +16,8 @@ pub fn build(b: *std.Build) !void {
             .link_libc = true,
         });
 
+        module.addIncludePath(b.path("zig-out/include"));
+
         const lib = b.addLibrary(.{
             .name = "testing",
             .root_module = module,
