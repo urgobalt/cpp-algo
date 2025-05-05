@@ -23,7 +23,6 @@ pub fn build(b: *std.Build) !void {
         });
 
         lib.installHeader(b.path("testing/testing.h"), "testing");
-
         b.installArtifact(lib);
 
         break :testing_lib lib;
