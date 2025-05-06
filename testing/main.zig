@@ -59,44 +59,58 @@ export fn test_test(s: *c.adtOperations) c_int {
     return c_test_all(adtBuilder, &.{internal_test_adt});
 }
 
-const insertionOrder = enum(c_int) {
-    unknown = 0,
-    firstInFirstOut = -1,
-    firstInLastOut = -2,
-};
+const insertionOrder = enum(c_int) { unknown = 0, firstInFirstOut = -1, firstInLastOut = -2, _ };
 
 const Complexity = enum(c_int) {
     none = 0,
-    @"O(1)" = 1,
-    @"O(n)" = 2,
-    @"O(nlogn)" = 3,
-    @"O(n^2)" = 4,
-    undetermined = 5,
-    insufficientData = 6,
+    @"O(1)" = -1,
+    @"O(n)" = -2,
+    @"O(nlogn)" = -3,
+    @"O(n^2)" = -4,
+    undetermined = -5,
+    insufficientData = -6,
+    _,
 };
 
-const adtTestingOptions = struct {
+const Verbosity = enum(c_int) {
+    @"error" = 0,
+    warning = -1,
+    info = -2,
+    debug = -3,
+    _,
+};
+
+const AdtTestingOptions = struct {
+    verbosity: Verbosity,
     order: insertionOrder,
     sorted_output: bool,
-    input_sizes: []c_int,
+    input_sizes: ?[]c_int,
     estimate_complexity: bool,
     expected_worst_complexity: Complexity,
-    expected_avarage_complexity: Complexity,
+    expected_average_complexity: Complexity,
     expected_best_complexity: Complexity,
 
-    fn convert(options: *c.adtTestingOptions) adtTestingOptions {
+    fn convert(options: *c.adtTestingOptions) AdtTestingOptions {
+        var input_sizes: ?[]c_int = null;
+        if (options.input_sizes) |s| {
+            input_sizes = s[0..@intCast(options.input_sizes_size)];
+        }
+
         return .{
+            .verbosity = @enumFromInt(options.verbosity),
             .order = @enumFromInt(options.order),
             .sorted_output = options.sorted_output,
-            .input_sizes = options.input_sizes[0..options.input_sizes_size],
+            .input_sizes = input_sizes,
             .estimate_complexity = options.estimate_complexity,
             .expected_worst_complexity = @enumFromInt(options.expected_worst_complexity),
-            .expected_avarage_complexity = @enumFromInt(options.expected_avarage_complexity),
+            .expected_average_complexity = @enumFromInt(options.expected_average_complexity),
             .expected_best_complexity = @enumFromInt(options.expected_best_complexity),
         };
     }
 };
 
-export fn test_adt(_: *c.adtOperations, _: c.adtTestingOptions) c_int {
+export fn test_adt(_: *c.adtOperations, c_options: *c.adtTestingOptions) c_int {
+    const options = AdtTestingOptions.convert(c_options);
+    std.debug.print("{d}", .{@intFromEnum(options.order)});
     return 0;
 }
