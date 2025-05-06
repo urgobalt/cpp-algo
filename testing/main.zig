@@ -1,90 +1,92 @@
 const std = @import("std");
 const tracking = @import("track.zig");
+
 comptime {
     _ = tracking;
 }
+
 pub const c = @cImport({
     @cInclude("testing");
 });
-const TestingError = error{
-    NULL_PTR,
-    EMPTY,
-    ALLOC,
-    INVALID_HANDLE,
 
-    OTHER,
+const TestingError = error{
+    nullPtr,
+    empty,
+    alloc,
+    invalidHandle,
+    other,
 };
 
-fn intToTestingAccessError(err_code: c_int) TestingError {
-    switch (err_code) {
-        c.adt_RESULT_ERROR_NULL_PTR => return error.NULL_PTR,
-        c.adt_RESULT_ERROR_EMPTY => return error.EMPTY,
-        c.adt_RESULT_ERROR_ALLOC => return error.ALLOC,
-        c.adt_RESULT_ERROR_OTHER => return error.OTHER,
-        c.adt_RESULT_ERROR_INVALID_HANDLE => return error.INVALID_HANDLE,
-        else => return error.OTHER,
-    }
+inline fn asTestingError(code: c_int) TestingError!void {
+    if (code == c.ADT_RESULT_SUCCESS) return;
+    return intToTestingError(code);
 }
-fn TestingAccessErrorToInt(err_code: TestingError) c_int {
-    switch (err_code) {
-        error.NULL_PTR => return c.adt_RESULT_ERROR_NULL_PTR,
-        error.EMPTY => return c.adt_RESULT_ERROR_EMPTY,
-        error.ALLOC => return c.adt_RESULT_ERROR_ALLOC,
-        error.OTHER => return c.adt_RESULT_ERROR_OTHER,
-        error.INVALID_HANDLE => return c.adt_RESULT_ERROR_INVALID_HANDLE,
-    }
+
+inline fn intToTestingError(code: c_int) TestingError {
+    return switch (code) {
+        c.ADT_RESULT_ERROR_NULL_PTR => TestingError.nullPtr,
+        c.ADT_RESULT_ERROR_EMPTY => TestingError.empty,
+        c.ADT_RESULT_ERROR_ALLOC => TestingError.alloc,
+        c.ADT_RESULT_ERROR_INVALID_HANDLE => TestingError.invalidHandle,
+        else => TestingError.other,
+    };
 }
+
+inline fn unwrapTesting(comptime returnType: type, obj: returnType, code: c_int) TestingError!returnType {
+    return switch (code) {
+        c.ADT_RESULT_SUCCESS => obj,
+        else => intToTestingError(code),
+    };
+}
+
+inline fn testingErrorToInt(@"error": TestingError) c_int {
+    return switch (@"error") {
+        TestingError.nullPtr => c.ADT_RESULT_ERROR_NULL_PTR,
+        TestingError.empty => c.ADT_RESULT_ERROR_EMPTY,
+        TestingError.alloc => c.ADT_RESULT_ERROR_ALLOC,
+        TestingError.invalidHandle => c.ADT_RESULT_ERROR_INVALID_HANDLE,
+        TestingError.other => c.ADT_RESULT_ERROR_OTHER,
+    };
+}
+
 const TrackingObject = struct {
     backing: c.TrackedItemHandle,
     fn init(value: i32, order: i32) !TrackingObject {
         var handle: c.TrackedItemHandle = null;
         const a = c.create_value(@intCast(value), @intCast(order), &handle);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
-        return TrackingObject{ .backing = handle };
+        return unwrapTesting(TrackingObject, .{ .backing = handle }, a);
     }
 
-    fn deinit(self: @This()) void {
+    fn deinit(self: @This()) !void {
         const a = c.destroy_tracked_item(self.backing);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
+        return asTestingError(a);
     }
 };
+
 const ADT = struct {
     int_adt: c.ADTHandle,
     ops: *c.adtOperations,
     order: c.InsertionOrder,
     fn deinit(self: @This()) !void {
         const a: c.testingResultCode = self.ops.destroy.?(self.int_adt);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
+        return asTestingError(a);
     }
     fn insert(self: @This(), t: TrackingObject) !void {
         const a = self.ops.insert.?(self.int_adt, t.backing.?.*);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
+        return asTestingError(a);
     }
     fn peek(self: @This()) !TrackingObject {
-        var adt = null;
+        var adt: c.TrackedItemHandle = null;
         const a: c.testingResultCode = self.ops.peek.?(self.int_adt, &adt);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
-        return TrackingObject{ .backing = adt };
+        return unwrapTesting(TrackingObject, .{ .backing = adt }, a);
     }
     fn remove(self: @This()) !TrackingObject {
         var adt: c.TrackedItemHandle = null;
         const a = self.ops.remove.?(self.int_adt, &adt);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
-        return TrackingObject{ .backing = adt };
+        return unwrapTesting(TrackingObject, .{ .backing = adt }, a);
     }
 };
+
 const ADTBuilder = struct {
     ops: *c.adtOperations,
 
@@ -94,24 +96,24 @@ const ADTBuilder = struct {
     fn create(self: ADTBuilder) !ADT {
         var adt: c.ADTHandle = null;
         const a = self.ops.create.?(&adt);
-        if (a != c.adt_RESULT_SUCCESS) {
-            return intToTestingAccessError(a);
-        }
-        return ADT{ .int_adt = adt, .ops = self.ops, .order = self.ops.order };
+        return unwrapTesting(ADT, .{ .int_adt = adt, .ops = self.ops, .order = self.ops.order }, a);
     }
 };
+
 fn assert_eq(new_value: c_int, old_value: c_int) void {
     if (new_value != old_value) {
         std.debug.print("invalid value, expected:{}, got {}", .{ new_value, old_value });
     }
 }
+
 export fn test_simple_adt(s: *c.adtOperations) c_int {
     const adtBuilder = ADTBuilder.init(s);
     internal_test_adt(adtBuilder) catch |err| {
-        return TestingAccessErrorToInt(err);
+        return testingErrorToInt(err);
     };
-    return c.adt_RESULT_SUCCESS;
+    return c.ADT_RESULT_SUCCESS;
 }
+
 fn internal_test_adt(adt_builder: ADTBuilder) !void {
     const adt: ADT = try adt_builder.create();
     const value = 10;

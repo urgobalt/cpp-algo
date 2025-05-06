@@ -21,12 +21,12 @@ typedef enum {
 } InsertionOrder;
 
 typedef enum {
-  adt_RESULT_SUCCESS = 0,
-  adt_RESULT_ERROR_NULL_PTR = -1,
-  adt_RESULT_ERROR_EMPTY = -2,
-  adt_RESULT_ERROR_ALLOC = -3,
-  adt_RESULT_ERROR_INVALID_HANDLE = -5,
-  adt_RESULT_ERROR_OTHER = -4
+  ADT_RESULT_SUCCESS = 0,
+  ADT_RESULT_ERROR_NULL_PTR = -1,
+  ADT_RESULT_ERROR_EMPTY = -2,
+  ADT_RESULT_ERROR_ALLOC = -3,
+  ADT_RESULT_ERROR_INVALID_HANDLE = -5,
+  ADT_RESULT_ERROR_OTHER = -4
 } testingResultCode;
 
 typedef void *ADTHandle;
@@ -170,14 +170,14 @@ public:
 
 testingResultCode create_default(TrackedItemHandle *handle_out) {
   *handle_out = (new TrackedItem())->get_c();
-  return testingResultCode::adt_RESULT_SUCCESS;
+  return testingResultCode::ADT_RESULT_SUCCESS;
 };
 
 testingResultCode create_value(int value, int order,
                                TrackedItemHandle *handle_out) {
 
   *handle_out = (new TrackedItem(value, order))->get_c();
-  return testingResultCode::adt_RESULT_SUCCESS;
+  return testingResultCode::ADT_RESULT_SUCCESS;
 };
 inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   os << obj.value;
@@ -193,17 +193,17 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   ([](ADTHandle *handle_out) -> testingResultCode {                            \
     /* Static lambda - NO CAPTURE */                                           \
     if (!handle_out) {                                                         \
-      return adt_RESULT_ERROR_NULL_PTR;                                        \
+      return ADT_RESULT_ERROR_NULL_PTR;                                        \
     }                                                                          \
     try {                                                                      \
       *handle_out = new CPP_TYPE();                                            \
-      return adt_RESULT_SUCCESS;                                               \
+      return ADT_RESULT_SUCCESS;                                               \
     } catch (const std::bad_alloc &) {                                         \
       *handle_out = nullptr;                                                   \
-      return adt_RESULT_ERROR_ALLOC;                                           \
+      return ADT_RESULT_ERROR_ALLOC;                                           \
     } catch (...) {                                                            \
       *handle_out = nullptr;                                                   \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     }                                                                          \
   }) // End of lambda
 
@@ -219,11 +219,11 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
       /* Destroying a null handle could be SUCCESS or ERROR */                 \
       /* Let's treat it as an error based on function signature needing a      \
        * valid handle */                                                       \
-      return adt_RESULT_ERROR_INVALID_HANDLE;                                  \
+      return ADT_RESULT_ERROR_INVALID_HANDLE;                                  \
     }                                                                          \
     CPP_TYPE *obj = static_cast<CPP_TYPE *>(handle);                           \
     delete obj;                                                                \
-    return adt_RESULT_SUCCESS;                                                 \
+    return ADT_RESULT_SUCCESS;                                                 \
   }) // End of lambda
 
 /**
@@ -241,11 +241,11 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   ([](ADTHandle handle, TrackedItemHandle *value_out) -> testingResultCode {   \
     /* Static lambda - NO CAPTURE */                                           \
     if (!value_out) {                                                          \
-      return adt_RESULT_ERROR_NULL_PTR;                                        \
+      return ADT_RESULT_ERROR_NULL_PTR;                                        \
     }                                                                          \
     *value_out = nullptr;                                                      \
     if (!handle) {                                                             \
-      return adt_RESULT_ERROR_INVALID_HANDLE;                                  \
+      return ADT_RESULT_ERROR_INVALID_HANDLE;                                  \
     }                                                                          \
                                                                                \
     const CPP_TYPE *sl = static_cast<const CPP_TYPE *>(handle);                \
@@ -264,14 +264,14 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
       /* *** UNSAFE CONST_CAST *** needed for the current C API */             \
       *value_out = const_cast<CTrackedItem *>(c_item_ptr_const);               \
                                                                                \
-      return adt_RESULT_SUCCESS;                                               \
+      return ADT_RESULT_SUCCESS;                                               \
     } catch (const std::out_of_range &) {                                      \
       /* Assuming out_of_range means empty */                                  \
-      return adt_RESULT_ERROR_EMPTY;                                           \
+      return ADT_RESULT_ERROR_EMPTY;                                           \
     } catch (const std::exception &) {                                         \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     } catch (...) {                                                            \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     }                                                                          \
   }) // End of lambda
 
@@ -287,7 +287,7 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   ([](ADTHandle handle, CTrackedItem value) -> testingResultCode {             \
     /* Static lambda - NO CAPTURE */                                           \
     if (!handle) {                                                             \
-      return adt_RESULT_ERROR_INVALID_HANDLE;                                  \
+      return ADT_RESULT_ERROR_INVALID_HANDLE;                                  \
     }                                                                          \
                                                                                \
     CPP_TYPE *sl = static_cast<CPP_TYPE *>(handle);                            \
@@ -295,13 +295,13 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
       /* Convert C value to C++ object and call method by name */              \
       /* Assumes CPP_METHOD_NAME takes TrackedItem by value or const ref */    \
       sl->CPP_METHOD_NAME(TrackedItem(value));                                 \
-      return adt_RESULT_SUCCESS;                                               \
+      return ADT_RESULT_SUCCESS;                                               \
     } catch (const std::bad_alloc &) {                                         \
-      return adt_RESULT_ERROR_ALLOC;                                           \
+      return ADT_RESULT_ERROR_ALLOC;                                           \
     } catch (const std::exception &) {                                         \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     } catch (...) {                                                            \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     }                                                                          \
   }) // End of lambda
 
@@ -322,11 +322,11 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   ([](ADTHandle handle, TrackedItemHandle *value_out) -> testingResultCode {   \
     /* Static lambda - NO CAPTURE */                                           \
     if (!value_out) {                                                          \
-      return adt_RESULT_ERROR_NULL_PTR;                                        \
+      return ADT_RESULT_ERROR_NULL_PTR;                                        \
     }                                                                          \
     *value_out = nullptr;                                                      \
     if (!handle) {                                                             \
-      return adt_RESULT_ERROR_INVALID_HANDLE;                                  \
+      return ADT_RESULT_ERROR_INVALID_HANDLE;                                  \
     }                                                                          \
                                                                                \
     CPP_TYPE *sl = static_cast<CPP_TYPE *>(handle);                            \
@@ -338,24 +338,24 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
       /* Use nothrow to avoid exception during allocation check */             \
       CTrackedItem *allocated_copy = new (std::nothrow) CTrackedItem();        \
       if (!allocated_copy) {                                                   \
-        return adt_RESULT_ERROR_ALLOC;                                         \
+        return ADT_RESULT_ERROR_ALLOC;                                         \
       }                                                                        \
       allocated_copy->value = removed_item.value;                              \
       allocated_copy->order = removed_item.order;                              \
       *value_out = allocated_copy;                                             \
       /* ********************************************** */                     \
                                                                                \
-      return adt_RESULT_SUCCESS;                                               \
+      return ADT_RESULT_SUCCESS;                                               \
     } catch (const std::out_of_range &) {                                      \
       /* Assuming out_of_range means empty */                                  \
-      return adt_RESULT_ERROR_EMPTY;                                           \
+      return ADT_RESULT_ERROR_EMPTY;                                           \
     } catch (const std::bad_alloc &) {                                         \
       /* If allocation *within* the C++ method failed */                       \
-      return adt_RESULT_ERROR_ALLOC;                                           \
+      return ADT_RESULT_ERROR_ALLOC;                                           \
     } catch (const std::exception &) {                                         \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     } catch (...) {                                                            \
-      return adt_RESULT_ERROR_OTHER;                                           \
+      return ADT_RESULT_ERROR_OTHER;                                           \
     }                                                                          \
   }) // End of lambda
 /**
