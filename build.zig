@@ -9,6 +9,11 @@ pub fn build(b: *std.Build) !void {
     const cpp_binaries = CppBinaries.init(.{ .build = b, .target = target, .optimize = optimize });
 
     const header_file = b.addInstallFileWithDir(b.path("testing/testing.h"), .header, "testing");
+    const impl_header_files = b.addInstallDirectory(.{
+        .source_dir = b.path("impls"),
+        .install_dir = .header,
+        .install_subdir = "impls",
+    });
 
     const testing_lib = testing_lib: {
         const module = b.createModule(.{
@@ -36,6 +41,7 @@ pub fn build(b: *std.Build) !void {
     const b2 = cpp_binaries.create_cpp_exe("b2", b.path("./src/b2.cc"));
     b2.linkLibrary(testing_lib);
     b2.step.dependOn(&header_file.step);
+    b2.step.dependOn(&impl_header_files.step);
     b2.addIncludePath(b.path("zig-out/include"));
 
     const run = b.step("run", "Run all the binaries built");
