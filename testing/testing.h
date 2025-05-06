@@ -1,4 +1,3 @@
-
 #ifndef TESTING_H
 #define TESTING_H
 
@@ -14,6 +13,14 @@ typedef struct {
   int order;
 } CTrackedItem;
 
+enum Verbosity {
+  Error = 0,
+  Warning = -1,
+  Info = -2,
+  Debug = -2,
+};
+
+#define Verbosity enum Verbosity
 enum InsertionOrder {
   Unknown = 0,
   FirstInFirstOut = -1,
@@ -44,15 +51,16 @@ struct adtOperations {
 };
 enum Complexity {
   None = 0,
-  O1 = 1,
-  ON = 2,
-  ONLogN = 3,
-  ON2 = 4,
-  Undetermined = 5,
-  InsufficientData = 6
+  O1 = -1,
+  ON = -2,
+  ONLogN = -3,
+  ON2 = -4,
+  Undetermined = -5,
+  InsufficientData = -6
 };
 #define Complexity enum Complexity
 struct adtTestingOptions {
+  Verbosity verbosity;
   InsertionOrder order;
   bool sorted_output;
   int *input_sizes;
