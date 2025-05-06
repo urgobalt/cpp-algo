@@ -8,27 +8,28 @@
 extern "C" {
 #endif
 
-typedef struct {
+struct CTrackedItem_s {
   int value;
   int order;
-} CTrackedItem;
+};
+typedef struct CTrackedItem_s CTrackedItem;
 
-enum Verbosity {
+enum Verbosity_e {
   Error = 0,
   Warning = -1,
   Info = -2,
   Debug = -2,
 };
 
-#define Verbosity enum Verbosity
-enum InsertionOrder {
+typedef enum Verbosity_e Verbosity;
+enum InsertionOrder_e {
   Unknown = 0,
   FirstInFirstOut = -1,
   FirstInLastOut = -2,
 };
 
-#define InsertionOrder enum InsertionOrder
-enum testingResultCode {
+typedef enum InsertionOrder_e InsertionOrder;
+enum testingResultCode_e {
   ADT_RESULT_SUCCESS = 0,
   ADT_RESULT_ERROR_NULL_PTR = -1,
   ADT_RESULT_ERROR_EMPTY = -2,
@@ -37,11 +38,11 @@ enum testingResultCode {
   ADT_RESULT_ERROR_OTHER = -4
 };
 
-#define testingResultCode enum testingResultCode
+typedef enum testingResultCode_e testingResultCode;
 typedef void *ADTHandle;
 typedef CTrackedItem *TrackedItemHandle;
 
-struct adtOperations {
+struct adtOperations_s {
   testingResultCode (*insert)(ADTHandle handle, CTrackedItem value);
   testingResultCode (*remove)(ADTHandle handle, TrackedItemHandle *value_out);
   testingResultCode (*peek)(ADTHandle handle, TrackedItemHandle *value_out);
@@ -49,7 +50,8 @@ struct adtOperations {
       ADTHandle *handle_out); // allways nullptr otherwise unsafe
   testingResultCode (*destroy)(ADTHandle handle);
 };
-enum Complexity {
+typedef struct adtOperations_s adtOperations;
+enum Complexity_e {
   None = 0,
   O1 = -1,
   ON = -2,
@@ -58,8 +60,8 @@ enum Complexity {
   Undetermined = -5,
   InsufficientData = -6
 };
-#define Complexity enum Complexity
-struct adtTestingOptions {
+typedef enum Complexity_e Complexity;
+struct adtTestingOptions_s {
   Verbosity verbosity;
   InsertionOrder order;
   bool sorted_output;
@@ -69,7 +71,18 @@ struct adtTestingOptions {
   Complexity expected_worst_complexity;
   Complexity expected_average_complexity;
   Complexity expected_best_complexity;
+} adtTestingOptions_default{
+    .verbosity = Verbosity::Error,
+    .order = InsertionOrder::Unknown,
+    .sorted_output = true,
+    .input_sizes = new int[9]{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000},
+    .input_sizes_size = 9,
+    .estimate_complexity = true,
+    .expected_worst_complexity = Complexity::None,
+    .expected_average_complexity = Complexity::None,
+    .expected_best_complexity = Complexity::None,
 };
+typedef struct adtTestingOptions_s adtTestingOptions;
 
 testingResultCode create_default(TrackedItemHandle *handle_out);
 testingResultCode create_value(int value, int order,
@@ -106,8 +119,8 @@ void notify_compare_lte(void);
  * (>=). */
 void notify_compare_gte(void);
 
-int test_test(struct adtOperations *);
-int test_adt(struct adtOperations *, struct adtTestingOptions *);
+int test_test(adtOperations *);
+int test_adt(adtOperations *, adtTestingOptions *);
 
 #ifdef __cplusplus
 }

@@ -4,7 +4,7 @@
 int main() {
   adtOperations *sll = CREATE_ADT_OPERATIONS(Heap<TrackedItem>, insert, extract,
                                              peek, FirstInLastOut);
-  adtTestingOptions options = {.order = Unknown};
+  adtTestingOptions_s options = adtTestingOptions_default;
 
   test_adt(sll, &options);
 }

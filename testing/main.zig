@@ -1,4 +1,7 @@
 const std = @import("std");
+comptime {
+    _ = @import("functions.zig");
+}
 pub const c = @cImport({
     @cInclude("testing");
 });
