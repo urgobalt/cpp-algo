@@ -2,6 +2,7 @@ const c = @cImport({
     @cInclude("testing");
 });
 const errors = @import("error.zig");
+const TrackingObject = @import("track.zig").TrackingObject;
 
 pub const ADT = struct {
     int_adt: c.ADTHandle,
@@ -39,4 +40,3 @@ pub const ADTBuilder = struct {
         return errors.unwrapTesting(ADT, .{ .int_adt = adt, .ops = self.ops, .order = self.ops.order }, a);
     }
 };
-

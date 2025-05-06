@@ -1,7 +1,7 @@
 const c = @cImport({
     @cInclude("testing");
 });
-const TestingError = error{
+pub const TestingError = error{
     nullPtr,
     empty,
     alloc,
