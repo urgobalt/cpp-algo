@@ -9,12 +9,12 @@ pub const TestingError = error{
     other,
 };
 
-inline fn asTestingError(code: c_int) TestingError!void {
+pub inline fn asTestingError(code: c_int) TestingError!void {
     if (code == c.ADT_RESULT_SUCCESS) return;
     return intToTestingError(code);
 }
 
-inline fn intToTestingError(code: c_int) TestingError {
+pub inline fn intToTestingError(code: c_int) TestingError {
     return switch (code) {
         c.ADT_RESULT_ERROR_NULL_PTR => TestingError.nullPtr,
         c.ADT_RESULT_ERROR_EMPTY => TestingError.empty,
@@ -24,14 +24,14 @@ inline fn intToTestingError(code: c_int) TestingError {
     };
 }
 
-inline fn unwrapTesting(comptime returnType: type, obj: returnType, code: c_int) TestingError!returnType {
+pub inline fn unwrapTesting(comptime returnType: type, obj: returnType, code: c_int) TestingError!returnType {
     return switch (code) {
         c.ADT_RESULT_SUCCESS => obj,
         else => intToTestingError(code),
     };
 }
 
-inline fn testingErrorToInt(@"error": TestingError) c_int {
+pub inline fn testingErrorToInt(@"error": TestingError) c_int {
     return switch (@"error") {
         TestingError.nullPtr => c.ADT_RESULT_ERROR_NULL_PTR,
         TestingError.empty => c.ADT_RESULT_ERROR_EMPTY,

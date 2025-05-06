@@ -33,13 +33,20 @@ fn c_test_all(adt_builder: ADTBuilder, tests: []const *const fn (ADTBuilder) Tes
     return c.ADT_RESULT_SUCCESS;
 }
 
+fn c_test(adt_builder: ADTBuilder, @"test": *const fn (ADTBuilder) TestingError!void) c_int {
+    @"test"(adt_builder) catch |err| {
+        return errors.testingErrorToInt(err);
+    };
+    return c.ADT_RESULT_SUCCESS;
+}
+
 fn internal_test_adt(adt_builder: ADTBuilder) !void {
     const adtb = try adt_builder.create();
     const value = 10;
     const order = 1;
     const t = try TrackingObject.init(value, order);
     try adtb.insert(t);
-    const tn = try adt.remove();
+    const tn = try adtb.remove();
     const new_value = tn.backing.*.value;
     assert_eq(new_value, value);
     const new_order = tn.backing.*.order;
@@ -47,7 +54,49 @@ fn internal_test_adt(adt_builder: ADTBuilder) !void {
     std.debug.print("TADA you have passed the zig tests", .{});
 }
 
-export fn test_simple_adt(s: *c.adtOperations) c_int {
+export fn test_test(s: *c.adtOperations) c_int {
     const adtBuilder = ADTBuilder.init(s);
     return c_test_all(adtBuilder, &.{internal_test_adt});
+}
+
+const insertionOrder = enum(c_int) {
+    unknown = 0,
+    firstInFirstOut = -1,
+    firstInLastOut = -2,
+};
+
+const Complexity = enum(c_int) {
+    none = 0,
+    @"O(1)" = 1,
+    @"O(n)" = 2,
+    @"O(nlogn)" = 3,
+    @"O(n^2)" = 4,
+    undetermined = 5,
+    insufficientData = 6,
+};
+
+const adtTestingOptions = struct {
+    order: insertionOrder,
+    sorted_output: bool,
+    input_sizes: []c_int,
+    estimate_complexity: bool,
+    expected_worst_complexity: Complexity,
+    expected_avarage_complexity: Complexity,
+    expected_best_complexity: Complexity,
+
+    fn convert(options: *c.adtTestingOptions) adtTestingOptions {
+        return .{
+            .order = @enumFromInt(options.order),
+            .sorted_output = options.sorted_output,
+            .input_sizes = options.input_sizes[0..options.input_sizes_size],
+            .estimate_complexity = options.estimate_complexity,
+            .expected_worst_complexity = @enumFromInt(options.expected_worst_complexity),
+            .expected_avarage_complexity = @enumFromInt(options.expected_avarage_complexity),
+            .expected_best_complexity = @enumFromInt(options.expected_best_complexity),
+        };
+    }
+};
+
+export fn test_adt(_: *c.adtOperations, _: c.adtTestingOptions) c_int {
+    return 0;
 }

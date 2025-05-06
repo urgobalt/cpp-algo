@@ -98,7 +98,8 @@ void notify_compare_lte(void);
  * (>=). */
 void notify_compare_gte(void);
 
-int test_simple_adt(struct adtOperations *);
+int test_test(struct adtOperations *);
+int test_adt(struct adtOperations *, struct adtTestingOptions *);
 
 #ifdef __cplusplus
 }

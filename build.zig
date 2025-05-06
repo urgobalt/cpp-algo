@@ -69,7 +69,7 @@ const CppBinaries = struct {
     const cflags = [_][]const u8{
         "-pedantic-errors",
         "-Wc++11-extensions",
-        "-std=c++17",
+        "-std=c++20",
         "-g",
     };
 
