@@ -14,21 +14,23 @@ typedef struct {
   int order;
 } CTrackedItem;
 
-typedef enum {
+enum InsertionOrder {
   Unknown = 0,
   FirstInFirstOut = -1,
   FirstInLastOut = -2,
-} InsertionOrder;
+};
 
-typedef enum {
+#define InsertionOrder enum InsertionOrder
+enum testingResultCode {
   ADT_RESULT_SUCCESS = 0,
   ADT_RESULT_ERROR_NULL_PTR = -1,
   ADT_RESULT_ERROR_EMPTY = -2,
   ADT_RESULT_ERROR_ALLOC = -3,
   ADT_RESULT_ERROR_INVALID_HANDLE = -5,
   ADT_RESULT_ERROR_OTHER = -4
-} testingResultCode;
+};
 
+#define testingResultCode enum testingResultCode
 typedef void *ADTHandle;
 typedef CTrackedItem *TrackedItemHandle;
 
@@ -39,16 +41,32 @@ struct adtOperations {
   testingResultCode (*create)(
       ADTHandle *handle_out); // allways nullptr otherwise unsafe
   testingResultCode (*destroy)(ADTHandle handle);
+};
+enum Complexity {
+  None = 0,
+  O1 = 1,
+  ON = 2,
+  ONLogN = 3,
+  ON2 = 4,
+  Undetermined = 5,
+  InsufficientData = 6
+};
+#define Complexity enum Complexity
+struct adtTestingOptions {
   InsertionOrder order;
+  bool sorted_output;
+  int *input_sizes;
+  int input_sizes_size;
+  bool estimate_complexity;
+  Complexity expected_worst_complexity;
+  Complexity expected_average_complexity;
+  Complexity expected_best_complexity;
 };
 
 testingResultCode create_default(TrackedItemHandle *handle_out);
-
 testingResultCode create_value(int value, int order,
                                TrackedItemHandle *handle_out);
-
 testingResultCode destroy_tracked_item(TrackedItemHandle handle);
-
 testingResultCode get_data(TrackedItemHandle handle, CTrackedItem *item_out);
 void notify_default_construct(void);
 
@@ -170,14 +188,14 @@ public:
 
 testingResultCode create_default(TrackedItemHandle *handle_out) {
   *handle_out = (new TrackedItem())->get_c();
-  return testingResultCode::ADT_RESULT_SUCCESS;
+  return ADT_RESULT_SUCCESS;
 };
 
 testingResultCode create_value(int value, int order,
                                TrackedItemHandle *handle_out) {
 
   *handle_out = (new TrackedItem(value, order))->get_c();
-  return testingResultCode::ADT_RESULT_SUCCESS;
+  return ADT_RESULT_SUCCESS;
 };
 inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   os << obj.value;
@@ -396,7 +414,6 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
     ops->insert = CREATE_INSERT_FN_PTR(CPP_TYPE, INSERT_METHOD_NAME);          \
     ops->remove = CREATE_REMOVE_FN_PTR(CPP_TYPE, REMOVE_METHOD_NAME);          \
     ops->peek = CREATE_PEEK_FN_PTR(CPP_TYPE, PEEK_METHOD_NAME);                \
-    ops->order = ORDER;                                                        \
     /* --- Sanity Check --- */                                                 \
     /* Verify that all function pointers were successfully assigned */         \
     /* (macros should always generate valid pointers if compilation succeeds)  \
