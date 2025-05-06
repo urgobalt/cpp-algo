@@ -15,6 +15,12 @@ typedef struct {
 } CTrackedItem;
 
 typedef enum {
+  Unknown = 0,
+  FirstInFirstOut = -1,
+  FirstInLastOut = -2,
+} InsertionOrder;
+
+typedef enum {
   adt_RESULT_SUCCESS = 0,
   adt_RESULT_ERROR_NULL_PTR = -1,
   adt_RESULT_ERROR_EMPTY = -2,
@@ -33,6 +39,7 @@ struct adtOperations {
   testingResultCode (*create)(
       ADTHandle *handle_out); // allways nullptr otherwise unsafe
   testingResultCode (*destroy)(ADTHandle handle);
+  InsertionOrder order;
 };
 
 testingResultCode create_default(TrackedItemHandle *handle_out);
@@ -73,7 +80,7 @@ void notify_compare_lte(void);
  * (>=). */
 void notify_compare_gte(void);
 
-int test_adt(struct adtOperations *);
+int test_simple_adt(struct adtOperations *);
 
 #ifdef __cplusplus
 }
@@ -373,7 +380,7 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
  * limitations.
  */
 #define CREATE_ADT_OPERATIONS(CPP_TYPE, INSERT_METHOD_NAME,                    \
-                              REMOVE_METHOD_NAME, PEEK_METHOD_NAME)            \
+                              REMOVE_METHOD_NAME, PEEK_METHOD_NAME, ORDER)     \
   ([]() -> adtOperations * {                                                   \
     /* Allocate the struct to hold the function pointers */                    \
     /* Use nothrow to prevent allocation exception here */                     \
@@ -389,7 +396,7 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
     ops->insert = CREATE_INSERT_FN_PTR(CPP_TYPE, INSERT_METHOD_NAME);          \
     ops->remove = CREATE_REMOVE_FN_PTR(CPP_TYPE, REMOVE_METHOD_NAME);          \
     ops->peek = CREATE_PEEK_FN_PTR(CPP_TYPE, PEEK_METHOD_NAME);                \
-                                                                               \
+    ops->order = ORDER;                                                        \
     /* --- Sanity Check --- */                                                 \
     /* Verify that all function pointers were successfully assigned */         \
     /* (macros should always generate valid pointers if compilation succeeds)  \

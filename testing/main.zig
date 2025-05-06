@@ -55,6 +55,7 @@ const TrackingObject = struct {
 const ADT = struct {
     int_adt: c.ADTHandle,
     ops: *c.adtOperations,
+    order: c.InsertionOrder,
     fn deinit(self: @This()) !void {
         const a: c.testingResultCode = self.ops.destroy.?(self.int_adt);
         if (a != c.adt_RESULT_SUCCESS) {
@@ -96,7 +97,7 @@ const ADTBuilder = struct {
         if (a != c.adt_RESULT_SUCCESS) {
             return intToTestingAccessError(a);
         }
-        return ADT{ .int_adt = adt, .ops = self.ops };
+        return ADT{ .int_adt = adt, .ops = self.ops, .order = self.ops.order };
     }
 };
 fn assert_eq(new_value: c_int, old_value: c_int) void {
@@ -104,7 +105,7 @@ fn assert_eq(new_value: c_int, old_value: c_int) void {
         std.debug.print("invalid value, expected:{}, got {}", .{ new_value, old_value });
     }
 }
-export fn test_adt(s: *c.adtOperations) c_int {
+export fn test_simple_adt(s: *c.adtOperations) c_int {
     const adtBuilder = ADTBuilder.init(s);
     internal_test_adt(adtBuilder) catch |err| {
         return TestingAccessErrorToInt(err);
