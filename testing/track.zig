@@ -1,4 +1,23 @@
+const c = @cImport({
+    @cInclude("testing");
+});
+const errors = @import("error.zig");
+
+pub const TrackingObject = struct {
+    backing: c.TrackedItemHandle,
+    fn init(value: i32, order: i32) !TrackingObject {
+        var handle: c.TrackedItemHandle = null;
+        const a = c.create_value(@intCast(value), @intCast(order), &handle);
+        return errors.unwrapTesting(TrackingObject, .{ .backing = handle }, a);
+    }
+
+    fn deinit(self: @This()) !void {
+        const a = c.destroy_tracked_item(self.backing);
+        return errors.asTestingError(a);
+    }
+};
 const std = @import("std");
+
 // Define the struct to hold the counts for each C++ operation.
 // Using u64 for counters to avoid overflow for a long time.
 const TrackedItemStats = struct {
