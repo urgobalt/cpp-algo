@@ -3,32 +3,12 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct CTrackedItem_s {
-  int value;
-  int order;
-};
-typedef struct CTrackedItem_s CTrackedItem;
-
-enum Verbosity_e {
-  Error = 0,
-  Warning = -1,
-  Info = -2,
-  Debug = -2,
-};
-
-typedef enum Verbosity_e Verbosity;
-enum InsertionOrder_e {
-  Unknown = 0,
-  FirstInFirstOut = -1,
-  FirstInLastOut = -2,
-};
-
-typedef enum InsertionOrder_e InsertionOrder;
+/*--- Error reporting ---*/
 enum testingResultCode_e {
   ADT_RESULT_SUCCESS = 0,
   ADT_RESULT_ERROR_NULL_PTR = -1,
@@ -39,59 +19,26 @@ enum testingResultCode_e {
 };
 
 typedef enum testingResultCode_e testingResultCode;
-typedef void *ADTHandle;
+
+/*--- Tracked Item ---*/
+struct CTrackedItem_s {
+  int value;
+  int order;
+};
+typedef struct CTrackedItem_s CTrackedItem;
+
 typedef CTrackedItem *TrackedItemHandle;
-
-struct adtOperations_s {
-  testingResultCode (*insert)(ADTHandle handle, CTrackedItem value);
-  testingResultCode (*remove)(ADTHandle handle, TrackedItemHandle *value_out);
-  testingResultCode (*peek)(ADTHandle handle, TrackedItemHandle *value_out);
-  testingResultCode (*create)(
-      ADTHandle *handle_out); // allways nullptr otherwise unsafe
-  testingResultCode (*destroy)(ADTHandle handle);
-};
-typedef struct adtOperations_s adtOperations;
-enum Complexity_e {
-  None = 0,
-  O1 = -1,
-  ON = -2,
-  ONLogN = -3,
-  ON2 = -4,
-  Undetermined = -5,
-  InsufficientData = -6
-};
-typedef enum Complexity_e Complexity;
-struct adtTestingOptions_s {
-  Verbosity verbosity;
-  InsertionOrder order;
-  bool sorted_output;
-  int *input_sizes;
-  int input_sizes_size;
-  bool estimate_complexity;
-  Complexity expected_worst_complexity;
-  Complexity expected_average_complexity;
-  Complexity expected_best_complexity;
-} adtTestingOptions_default{
-    .verbosity = Verbosity::Error,
-    .order = InsertionOrder::Unknown,
-    .sorted_output = true,
-    .input_sizes = new int[9]{10, 50, 100, 200, 500, 1000, 2000, 5000, 10000},
-    .input_sizes_size = 9,
-    .estimate_complexity = true,
-    .expected_worst_complexity = Complexity::None,
-    .expected_average_complexity = Complexity::None,
-    .expected_best_complexity = Complexity::None,
-};
-typedef struct adtTestingOptions_s adtTestingOptions;
-
 testingResultCode create_default(TrackedItemHandle *handle_out);
 testingResultCode create_value(int value, int order,
                                TrackedItemHandle *handle_out);
 testingResultCode destroy_tracked_item(TrackedItemHandle handle);
 testingResultCode get_data(TrackedItemHandle handle, CTrackedItem *item_out);
+/*--- Notifications for zig singleton---*/
+/** @brief Notifies Zig that a C++ TrackedItem was default constructed(Should
+ * not happen). */
 void notify_default_construct(void);
-
-/** @brief Notifies Zig that a C++ TrackedItem was constructed. */
+/** @brief Notifies Zig that a C++ TrackedItem was constructed(Should not
+ * happen). */
 void notify_value_construct(int value, int order);
 /** @brief Notifies Zig that a C++ TrackedItem was destroyed. */
 void notify_destruct(void);
@@ -119,8 +66,64 @@ void notify_compare_lte(void);
  * (>=). */
 void notify_compare_gte(void);
 
+/*--- Testing Options ---*/
+enum Verbosity_e {
+  Error = 0,
+  Warning = -1,
+  Info = -2,
+  Debug = -2,
+};
+
+typedef enum Verbosity_e Verbosity;
+enum InsertionOrder_e {
+  Unknown = 0,
+  FirstInFirstOut = -1,
+  FirstInLastOut = -2,
+};
+
+typedef enum InsertionOrder_e InsertionOrder;
+typedef struct adtOperations_s adtOperations;
+enum Complexity_e {
+  None = 0,
+  O1 = -1,
+  ON = -2,
+  ONLogN = -3,
+  ON2 = -4,
+  Undetermined = -5,
+  InsufficientData = -6
+};
+typedef enum Complexity_e Complexity;
+struct adtSimpleTestingOptions_s {
+  char *name;
+  Verbosity verbosity;
+  InsertionOrder order;
+  bool sorted_output;
+  int *input_sizes;
+  int input_sizes_size;
+  bool estimate_complexity;
+  Complexity expected_insert_complexity;
+  Complexity expected_peek_complexity;
+  Complexity expected_remove_complexity;
+};
+typedef struct adtSimpleTestingOptions_s adtSimpleTestingOptions;
+adtSimpleTestingOptions default_adtSimpleTestingOptions(char *name);
+// the pointer to the ADT in the operation
+typedef void *ADTHandle;
+
+/*--- Testing simple ADT Operations ---*/
+
+struct adtOperations_s {
+  testingResultCode (*insert)(ADTHandle handle, TrackedItemHandle value);
+  testingResultCode (*remove)(ADTHandle handle, TrackedItemHandle *value_out);
+  testingResultCode (*peek)(ADTHandle handle, TrackedItemHandle *value_out);
+  testingResultCode (*create)(
+      ADTHandle *handle_out); // allways nullptr otherwise unsafe
+  testingResultCode (*destroy)(ADTHandle handle);
+};
+
+/*--- Testing functions that exist ---*/
 int test_test(adtOperations *);
-int test_adt(adtOperations *, adtTestingOptions *);
+int test_adt(adtOperations *, adtSimpleTestingOptions *);
 
 #ifdef __cplusplus
 }
@@ -134,6 +137,7 @@ int test_adt(adtOperations *, adtTestingOptions *);
 
 #include <ostream>
 
+/*--- Cpp Struct Info ---*/
 struct TrackedItem {
   int value;
   int order;

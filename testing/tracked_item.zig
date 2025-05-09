@@ -15,6 +15,35 @@ pub const TrackingObject = struct {
         const a = c.destroy_tracked_item(self.backing);
         return errors.asTestingError(a);
     }
+    pub fn getValue(self: @This()) !i32 {
+        if (self.backing == null) return errors.AdtError.InvalidHandle;
+        (*self.backing);
+    }
+
+    pub fn getOrderId(self: @This()) !i32 {
+        if (self.backing == null) return errors.AdtError.InvalidHandle;
+        // Assumes c.get_tracked_item_order exists
+        var order_id: c_int = 0;
+        const result_code = c.get_tracked_item_order(self.backing, &order_id);
+        if (result_code != c.ADT_RESULT_SUCCESS) return errors.fromCErrorCode(result_code);
+        return @intCast(order_id);
+    }
+    pub fn eql(a: TrackingObject, b: TrackingObject) !bool {
+        if (a.backing == null or b.backing == null) return errors.AdtError.InvalidHandle;
+        var are_equal: bool = false;
+        const result_code = c.are_tracked_items_equal(a.backing, b.backing, &are_equal);
+        if (result_code != c.ADT_RESULT_SUCCESS) return errors.fromCErrorCode(result_code);
+        return are_equal;
+    }
+
+    pub fn lessThan(a: TrackingObject, b: TrackingObject) !bool {
+        if (a.backing == null or b.backing == null) return errors.AdtError.InvalidHandle;
+        // Assumes c.is_tracked_item_less_than exists
+        var is_less: bool = false;
+        const result_code = c.is_tracked_item_less_than(a.backing, b.backing, &is_less);
+        if (result_code != c.ADT_RESULT_SUCCESS) return errors.fromCErrorCode(result_code);
+        return is_less;
+    }
 };
 const std = @import("std");
 

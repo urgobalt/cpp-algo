@@ -1,12 +1,11 @@
 const std = @import("std");
-comptime {
-    _ = @import("functions.zig");
-}
 pub const c = @cImport({
     @cInclude("testing");
 });
-
-const tracking = @import("track.zig");
+const logging = @import("logging.zig");
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const global_allocator = gpa.allocator();
+const tracking = @import("tracked_item.zig");
 const TrackingObject = tracking.TrackingObject;
 
 // In case of link errors because (maybe) dead code elimination
@@ -14,106 +13,113 @@ comptime {
     _ = tracking;
 }
 
-const adt = @import("adt.zig");
-const ADTBuilder = adt.ADTBuilder;
-const ADT = adt.ADT;
+const adt = @import("adt_simple.zig");
+const ADTSimpleBuilder = adt.ADTSimpleBuilder;
+const ADT = adt.ADTSimple;
+
+const adt_options = @import("adt_options.zig");
+const AdtSimpleTestingOptions = adt_options.AdtSimpleTestingOptions;
 
 const errors = @import("error.zig");
 const TestingError = errors.TestingError;
 
+const test_runner = @import("test_runner.zig");
+const TestSuite = test_runner.TestSuite;
+const TestRunner = test_runner.TestRunner;
 fn assert_eq(new_value: c_int, old_value: c_int) void {
     if (new_value != old_value) {
         std.debug.print("invalid value, expected:{}, got {}", .{ new_value, old_value });
     }
 }
 
-fn c_test_all(adt_builder: ADTBuilder, tests: []const *const fn (ADTBuilder) TestingError!void) c_int {
-    for (tests) |@"test"| {
-        @"test"(adt_builder) catch |err| {
-            return errors.testingErrorToInt(err);
-        };
-    }
-    return c.ADT_RESULT_SUCCESS;
+export fn test_test(_: *c.adtOperations) c_int {
+    return -4;
+    // beacuse we changed how testing works this is no longer the same, we should use the testing as done bellow.
 }
 
-fn c_test(adt_builder: ADTBuilder, @"test": *const fn (ADTBuilder) TestingError!void) c_int {
-    @"test"(adt_builder) catch |err| {
-        return errors.testingErrorToInt(err);
+export fn test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOptions) c_int {
+    // here logging works as i want it to the rest is wrong
+    logging.log(.Info, "Starting ADT Testing Framework...\n", .{}) catch |err| {
+        return errors.testingErrorToCInt(err);
     };
-    return c.ADT_RESULT_SUCCESS;
-}
+    const options = AdtSimpleTestingOptions.convert(c_options);
+    const builder = ADTSimpleBuilder.init(c_adt_ops);
 
-fn internal_test_adt(adt_builder: ADTBuilder) !void {
-    const adtb = try adt_builder.create();
-    const value = 10;
-    const order = 1;
-    const t = try TrackingObject.init(value, order);
-    try adtb.insert(t);
-    const tn = try adtb.remove();
-    const new_value = tn.backing.*.value;
-    assert_eq(new_value, value);
-    const new_order = tn.backing.*.order;
-    assert_eq(new_order, order);
-    std.debug.print("TADA you have passed the zig tests", .{});
-}
+    var test_adt_suite = TestSuite.init(global_allocator, "FIFO Mock ADT Suite", builder, .{
+        .verbosity = .Debug, // Suite-level verbosity
+        .reset_stats_before_suite = true,
+        .print_stats_after_suite = true,
+    });
+    defer test_adt_suite.deinit();
 
-export fn test_test(s: *c.adtOperations) c_int {
-    const adtBuilder = ADTBuilder.init(s);
-    return c_test_all(adtBuilder, &.{internal_test_adt});
-}
+    try test_adt_suite.addCaseConfig(.{
+        .name = options.name + "Basic Ops",
+        .order = options.order,
+        .input_type = .Sorted,
+        .input_sizes = &[_]u32{ 5, 10 },
+    });
+    try test_adt_suite.addCaseConfig(.{
+        .name = options.name + "Empty Input",
+        .order = options.order,
+        .input_type = .Empty,
+        .input_sizes = &[_]u32{0},
+    });
+    try test_adt_suite.addCaseConfig(.{
+        .name = options.name + "Random Input",
+        .order = options.order,
+        .input_type = .RandomUniqueValues,
+        .input_sizes = &[_]u32{8},
+        .estimate_complexity = true,
+    });
 
-const insertionOrder = enum(c_int) { unknown = 0, firstInFirstOut = -1, firstInLastOut = -2, _ };
+    var runner = TestRunner.init(global_allocator, 0); // 0 for time-based master_seed
+    defer runner.deinit();
 
-const Complexity = enum(c_int) {
-    none = 0,
-    @"O(1)" = -1,
-    @"O(n)" = -2,
-    @"O(nlogn)" = -3,
-    @"O(n^2)" = -4,
-    undetermined = -5,
-    insufficientData = -6,
-    _,
-};
-
-const Verbosity = enum(c_int) {
-    @"error" = 0,
-    warning = -1,
-    info = -2,
-    debug = -3,
-    _,
-};
-
-const AdtTestingOptions = struct {
-    verbosity: Verbosity,
-    order: insertionOrder,
-    sorted_output: bool,
-    input_sizes: ?[]c_int,
-    estimate_complexity: bool,
-    expected_worst_complexity: Complexity,
-    expected_average_complexity: Complexity,
-    expected_best_complexity: Complexity,
-
-    fn convert(options: *c.adtTestingOptions) AdtTestingOptions {
-        var input_sizes: ?[]c_int = null;
-        if (options.input_sizes) |s| {
-            input_sizes = s[0..@intCast(options.input_sizes_size)];
+    try runner.addSuite(&test_adt_suite);
+    var final_results = runner.runAll() catch |err| {
+        logging.log(.Error, "Test Runner CRASHED: {any}\n", .{err});
+        if (gpa.deinit() == .leak) {
+            logging.print("Warning: Memory leak detected by GeneralPurposeAllocator after crash!\n", .{}) catch |terr| {
+                return errors.testingErrorToCInt(terr);
+            };
         }
+        return;
+    };
+    defer final_results.deinit();
 
-        return .{
-            .verbosity = @enumFromInt(options.verbosity),
-            .order = @enumFromInt(options.order),
-            .sorted_output = options.sorted_output,
-            .input_sizes = input_sizes,
-            .estimate_complexity = options.estimate_complexity,
-            .expected_worst_complexity = @enumFromInt(options.expected_worst_complexity),
-            .expected_average_complexity = @enumFromInt(options.expected_average_complexity),
-            .expected_best_complexity = @enumFromInt(options.expected_best_complexity),
-        };
+    final_results.printSummary(.Info) catch |terr| {
+        return errors.testingErrorToCInt(terr);
+    };
+
+    if (gpa.deinit() == .leak) {
+        try logging.log("Memory leak detected by GeneralPurposeAllocator at end of main!\n", .{} catch |terr| {
+            return errors.testingErrorToCInt(terr);
+        });
+    } else {
+        logging.log("GPA deinitialized successfully. No leaks reported by GPA.\n", .{} catch |terr| {
+            return errors.testingErrorToCInt(terr);
+        });
     }
-};
-
-export fn test_adt(_: *c.adtOperations, c_options: *c.adtTestingOptions) c_int {
-    const options = AdtTestingOptions.convert(c_options);
-    std.debug.print("{d}", .{@intFromEnum(options.order)});
-    return 0;
+    logging.log("ADT Testing Framework finished.\n", .{} catch |terr| {
+        return errors.testingErrorToCInt(terr);
+    });
+}
+export fn default_adtSimpleTestingOptions(name: [*c]u8) c.adtSimpleTestingOptions {
+    const initial_values = [_]c_int{ 10, 50, 100, 200, 500, 1000, 2000, 5000, 10000 };
+    const defaultSizes = std.heap.c_allocator.dupe(c_int, &initial_values) catch |err| {
+        std.debug.print("Invalid alloc {}", err);
+        std.process.abort();
+    };
+    return .{
+        .name = name,
+        .verbosity = @intFromEnum(.Error),
+        .order = @intFromEnum(.Unknown),
+        .sorted_output = true,
+        .input_sizes = @ptrCast(defaultSizes.ptr),
+        .input_sizes_size = 9,
+        .estimate_complexity = true,
+        .expected_insert_complexity = @intFromEnum(.None),
+        .expected_peek_complexity = @intFromEnum(.None),
+        .expected_remove_complexity = @intFromEnum(.None),
+    };
 }
