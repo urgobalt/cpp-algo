@@ -2,14 +2,16 @@ const std = @import("std");
 const c = @cImport({
     @cInclude("testing");
 });
-const logging=@import("logging.zig");
+const logging = @import("logging.zig");
 const errors = @import("error.zig");
 const tracked_item = @import("tracked_item.zig");
 const TrackingObject = tracked_item.TrackingObject;
 const testing_types = @import("adt_options.zig");
 const input_generators = @import("input_generators.zig");
 const test_results = @import("test_results.zig");
+const test_runner = @import("test_runner.zig");
 const adt = @import("adt_simple.zig");
+const Verbosity = @import("adt_options.zig").Verbosity;
 const AdtSimpleTestingOptions = testing_types.AdtSimpleTestingOptions;
 const InsertionOrder = testing_types.InsertionOrder;
 const TestCaseResult = test_results.TestCaseResult;
@@ -22,12 +24,12 @@ fn formatTracked(obj: TrackingObject, allocator: Allocator) ![]const u8 {
     const id = obj.getOrderId() catch -999;
     return std.fmt.allocPrint(allocator, "Tracked(val={d}, id={d}, handle={?*})", .{ val, id, obj.backing });
 }
-
+const MaybeTrackingObject = union { t: TrackingObject, v: void };
 pub fn runAdtTestCase(
     allocator: Allocator,
     adt_builder: ADTSimpleBuilder,
-    options: AdtSimpleTestingOptions,
-    prng: *std.rand.Random,
+    options: test_runner.TestOptions,
+    prng: *std.Random,
 ) !TestCaseResult {
     var result = TestCaseResult.init(options.name, allocator);
     const input_data_generated = input_generators.generateInputData(
@@ -35,35 +37,30 @@ pub fn runAdtTestCase(
         options.input_type,
         options.input_sizes[0],
         prng,
-        options.custom_input_data,
     ) catch |err| {
         var err_msg_buf: [128]u8 = undefined;
         var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
         errors.formatError(err, err_fbs.writer()) catch {};
-        try result.recordFailure("Input data generation failed", err_fbs.getWritten(), null, null);
+        result.recordFailure("Input data generation failed", err_fbs.getWritten(), null, null);
         return result;
     };
     defer input_generators.deinitTrackingObjectSlice(allocator, input_data_generated);
 
-    if (options.verbosity >= .Debug) {
-        try logging.log("  Test: {s}, Input Size: {d}, Type: {s}\n", .{
-            options.name, input_data_generated.len, @tagName(options.input_type),
-        });
-        if (options.verbosity >= .Trace and input_data_generated.len > 0 and input_data_generated.len < 20) {
-            try logging.log("    Input Data:\n", .{});
-            for (input_data_generated, 0..) |item, i| {
-                const val_str = item.getValue() catch |e| {
-                    std.debug.print("Failed to get value for trace: {any}", .{e});
-                    try logging.log("      [{d}] Error getting value\n", .{i});
-                    continue;
-                };
-                const id_str = item.getOrderId() catch |e| {
-                    std.debug.print("Failed to get order_id for trace: {any}", .{e});
-                    try logging.log("      [{d}] Error getting order_id\n", .{i});
-                    continue;
-                };
-                try logging.log("      [{d}] val={d}, id={d}\n", .{ i, val_str, id_str });
-            }
+    try logging.log(.Debug, "  Test: {s}, Input Size: {d}, Type: {s}\n", .{
+        options.name, input_data_generated.len, @tagName(options.input_type),
+    });
+    if (input_data_generated.len > 0 and input_data_generated.len < 20) {
+        try logging.log(.Trace, "    Input Data:\n", .{});
+        for (input_data_generated, 0..) |item, i| {
+            const val_str = item.getValue() catch |e| {
+                try logging.log(.Error, "      [{d}] Error getting value: {}\n", .{ i, e });
+                continue;
+            };
+            const id_str = item.getOrderId() catch |e| {
+                try logging.log(.Error, "      [{d}] Error getting order_id: {}\n", .{ i, e });
+                continue;
+            };
+            try logging.log(.Debug, "      [{d}] val={d}, id={d}\n", .{ i, val_str, id_str });
         }
     }
 
@@ -71,7 +68,7 @@ pub fn runAdtTestCase(
         var err_msg_buf: [128]u8 = undefined;
         var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
         errors.formatError(err, err_fbs.writer()) catch {};
-        try result.recordFailure("ADT creation failed", err_fbs.getWritten(), null, null);
+        result.recordFailure("ADT creation failed", err_fbs.getWritten(), null, null);
         return result;
     };
     defer adt_instance.deinit() catch |err| {
@@ -80,7 +77,7 @@ pub fn runAdtTestCase(
             var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
             errors.formatError(err, err_fbs.writer()) catch {};
             result.recordFailure("ADT deinit failed post-test", err_fbs.getWritten(), null, null);
-        } else if (options.verbosity >= .Error) {
+        } else if (@intFromEnum(options.verbosity) >= @intFromEnum(Verbosity.Error)) {
             std.debug.print("Error during ADT deinit after a test failure (error not recorded in result): {any}\n", .{err});
         }
     };
@@ -95,7 +92,7 @@ pub fn runAdtTestCase(
             var err_msg_buf: [128]u8 = undefined;
             var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
             errors.formatError(err, err_fbs.writer()) catch {};
-            try result.recordFailure(
+            result.recordFailure(
                 "ADT insert failed",
                 try std.fmt.allocPrint(allocator, "Item: {s}, Error: {s}", .{ item_str, err_fbs.getWritten() }),
                 null,
@@ -120,7 +117,7 @@ pub fn runAdtTestCase(
             var err_msg_buf: [128]u8 = undefined;
             var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
             errors.formatError(err, err_fbs.writer()) catch {};
-            try result.recordFailure("ADT peek failed", err_fbs.getWritten(), null, null);
+            result.recordFailure("ADT peek failed", err_fbs.getWritten(), null, null);
             return result;
         };
 
@@ -142,7 +139,7 @@ pub fn runAdtTestCase(
                 }
                 expected_peek_candidate_idx = min_idx;
             },
-            .Unknown, .Undefined => {},
+            else => {},
         }
 
         if (expected_peek_candidate_idx) |idx| {
@@ -156,7 +153,7 @@ pub fn runAdtTestCase(
                 defer if (std.mem.eql(u8, expected_str, "FormattedExpectedError")) {} else {
                     allocator.free(expected_str);
                 };
-                try result.recordFailure(
+                result.recordFailure(
                     "Peek verification failed",
                     try std.fmt.allocPrint(allocator, "Order: {s}", .{@tagName(options.order)}),
                     expected_str,
@@ -166,24 +163,25 @@ pub fn runAdtTestCase(
             }
         }
     } else {
-        const peek_should_fail_err = adt_instance.peek() catch |err| {
-            if (err == errors.AdtError.Empty) {
-                if (options.verbosity >= .Trace) {
-                    try logging.log("    Peek on empty correctly failed with 'Empty'.\n", .{});
-                }
-            } else {
-                var err_msg_buf: [128]u8 = undefined;
-                var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
-                errors.formatError(err, err_fbs.writer()) catch {};
-                try result.recordFailure("Peek on empty ADT failed with unexpected error", err_fbs.getWritten(), "errors.AdtError.Empty", null);
-                return result;
-            }
-            if (err != errors.AdtError.Empty) return result;
-        };
-        const peeked_val_on_empty = peek_should_fail_err;
-        _ = peeked_val_on_empty;
-        try result.recordFailure("Peek on empty ADT unexpectedly succeeded", null, "Expected error.Empty", "Success");
-        return result;
+        Peak_Success: {
+            const peek_should_fail_err: TrackingObject =
+                adt_instance.peek() catch |err| {
+                    if (err == errors.AdtError.Empty) {
+                        try logging.log(.Trace, "    Peek on empty correctly failed with 'Empty'.\n", .{});
+                    } else {
+                        var err_msg_buf: [128]u8 = undefined;
+                        var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
+                        errors.formatError(err, err_fbs.writer()) catch {};
+                        result.recordFailure("Peek on empty ADT failed with unexpected error", err_fbs.getWritten(), "errors.AdtError.Empty", null);
+                        return result;
+                    }
+                    break :Peak_Success;
+                };
+            const peeked_val_on_empty = peek_should_fail_err;
+            _ = peeked_val_on_empty;
+            result.recordFailure("Peek on empty ADT unexpectedly succeeded", null, "Expected error.Empty", "Success");
+            return result;
+        }
     }
 
     var removed_items_list = std.ArrayList(TrackingObject).init(allocator);
@@ -199,7 +197,7 @@ pub fn runAdtTestCase(
             var err_msg_buf: [128]u8 = undefined;
             var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
             errors.formatError(err, err_fbs.writer()) catch {};
-            try result.recordFailure(
+            result.recordFailure(
                 "ADT remove failed",
                 try std.fmt.allocPrint(allocator, "Attempted to remove item #{d} of {d}. Error: {s}", .{ k + 1, input_data_generated.len, err_fbs.getWritten() }),
                 null,
@@ -220,7 +218,7 @@ pub fn runAdtTestCase(
     }
 
     if (removed_items_list.items.len != input_data_generated.len) {
-        try result.recordFailure(
+        result.recordFailure(
             "Mismatch in removed items count",
             null,
             try std.fmt.allocPrint(allocator, "{d}", .{input_data_generated.len}),
@@ -266,7 +264,7 @@ pub fn runAdtTestCase(
                 }.lessThanCtx);
                 for (pairs, 0..) |p, sorted_idx| expected_removed_ordered_indices[sorted_idx] = p.original_index;
             },
-            .Unknown, .Undefined => {},
+            else => {},
         }
 
         if (options.order != .Unknown and options.order != .Undefined) {
@@ -282,7 +280,7 @@ pub fn runAdtTestCase(
                     defer if (std.mem.eql(u8, expected_str, "FormattedExpectedError")) {} else {
                         allocator.free(expected_str);
                     };
-                    try result.recordFailure(
+                    result.recordFailure(
                         "Removed item mismatch or incorrect order",
                         try std.fmt.allocPrint(allocator, "Mismatch at removal index {d} for ADT order {s}", .{ removed_idx, @tagName(options.order) }),
                         expected_str,
@@ -306,7 +304,7 @@ pub fn runAdtTestCase(
                     defer if (std.mem.eql(u8, curr_str, "FormattedCurrError")) {} else {
                         allocator.free(curr_str);
                     };
-                    try result.recordFailure(
+                    result.recordFailure(
                         "Output not sorted by value as expected",
                         try std.fmt.allocPrint(allocator, "Order violation between index {d} ({s}) and {d} ({s})", .{ current_idx - 1, prev_str, current_idx, curr_str }),
                         "prev <= curr",
@@ -318,22 +316,20 @@ pub fn runAdtTestCase(
         }
     }
 
-    adt_instance.remove() catch |err| {
-        if (err == errors.AdtError.Empty) {
-            if (options.verbosity >= .Trace) {
-                try logging.log("    ADT correctly empty after all removals.\n", .{});
+    Peak_Success: {
+        _ = adt_instance.remove() catch |err| {
+            if (err == errors.AdtError.Empty) {
+                try logging.log(.Trace, "    ADT correctly empty after all removals.\n", .{});
+            } else {
+                var err_msg_buf: [128]u8 = undefined;
+                var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
+                errors.formatError(err, err_fbs.writer()) catch {};
+                result.recordFailure("ADT not empty or remove failed unexpectedly after all items removed", err_fbs.getWritten(), "errors.AdtError.Empty", null);
+                return result;
             }
-        } else {
-            var err_msg_buf: [128]u8 = undefined;
-            var err_fbs = std.io.fixedBufferStream(&err_msg_buf);
-            errors.formatError(err, err_fbs.writer()) catch {};
-            try result.recordFailure("ADT not empty or remove failed unexpectedly after all items removed", err_fbs.getWritten(), "errors.AdtError.Empty", null);
-            return result;
-        }
-        if (err != errors.AdtError.Empty) return result;
-    };
-    try result.recordFailure("ADT was not empty after all expected items were removed.", null, "ADT to be empty", "ADT not empty");
-    if (options.verbosity >= .Info and result.passed) {} else if (!result.passed and options.verbosity >= .Error) {}
-
+            break :Peak_Success;
+        };
+        result.recordFailure("ADT was not empty after all expected items were removed.", null, "ADT to be empty", "ADT not empty");
+    }
     return result;
 }

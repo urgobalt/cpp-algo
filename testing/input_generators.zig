@@ -16,7 +16,6 @@ pub const TestInputType = enum {
     RandomUniqueValues, // Shuffled unique values, ascending order_ids
     FewUniqueValues, // Many repeated values
     NearlySorted, // Mostly sorted with a few swaps
-    Custom, // User-provided data
     Empty,
 };
 // Generates TrackingObjects with values 0..size-1, order_ids 0..size-1
@@ -46,7 +45,7 @@ pub fn reversed(allocator: Allocator, size: usize) ![]TrackingObject {
 }
 
 // Generates TrackingObjects with unique values 0..size-1 (shuffled), order_ids 0..size-1
-pub fn randomUniqueValues(allocator: Allocator, size: usize, prng: *std.rand.Random) ![]TrackingObject {
+pub fn randomUniqueValues(allocator: Allocator, size: usize, prng: *std.Random) ![]TrackingObject {
     if (size == 0) return &[_]TrackingObject{};
     var arr = try allocator.alloc(TrackingObject, size);
     errdefer allocator.free(arr);
@@ -65,7 +64,7 @@ pub fn randomUniqueValues(allocator: Allocator, size: usize, prng: *std.rand.Ran
 }
 
 // Generates TrackingObjects with a few unique values, spread randomly. order_ids 0..size-1
-pub fn fewUniqueValues(allocator: Allocator, size: usize, prng: *std.rand.Random) ![]TrackingObject {
+pub fn fewUniqueValues(allocator: Allocator, size: usize, prng: *std.Random) ![]TrackingObject {
     if (size == 0) return &[_]TrackingObject{};
 
     var num_distinct_values: usize = @max(1, size / 10);
@@ -85,7 +84,7 @@ pub fn fewUniqueValues(allocator: Allocator, size: usize, prng: *std.rand.Random
 }
 
 // Generates TrackingObjects mostly sorted by value, with a few swaps. order_ids 0..size-1
-pub fn nearlySorted(allocator: Allocator, size: usize, prng: *std.rand.Random) ![]TrackingObject {
+pub fn nearlySorted(allocator: Allocator, size: usize, prng: *std.Random) ![]TrackingObject {
     if (size == 0) return &[_]TrackingObject{};
     var arr = try sorted(allocator, size); // Starts with sorted values and order_ids
     errdefer { // Ensure deinit is called on all successfully initialized objects in arr
@@ -126,8 +125,8 @@ pub fn deinitTrackingObjectSlice(allocator: Allocator, slice: []TrackingObject) 
 pub fn generateInputData(
     allocator: Allocator,
     input_type: TestInputType,
-    size: u32,
-    prng: *std.rand.Random,
+    size: c_int,
+    prng: *std.Random,
 ) FrameworkError![]TrackingObject {
     const usize_size: usize = @intCast(size);
     return switch (input_type) {

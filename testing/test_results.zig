@@ -35,7 +35,7 @@ pub const TestCaseResult = struct {
         details: ?[]const u8,
         expected: ?[]const u8,
         actual: ?[]const u8,
-    ) !void {
+    ) void {
         self.passed = false;
 
         if (self.failure) |*f| {
@@ -43,9 +43,9 @@ pub const TestCaseResult = struct {
         }
 
         var new_failure = TestFailure{ .reason = reason };
-        if (details) |d| new_failure.details = try self.allocator.dupe(u8, d);
-        if (expected) |e| new_failure.expected = try self.allocator.dupe(u8, e);
-        if (actual) |a| new_failure.actual = try self.allocator.dupe(u8, a);
+        if (details) |d| new_failure.details = self.allocator.dupe(u8, d) catch @panic("failed to allocate failure");
+        if (expected) |e| new_failure.expected = self.allocator.dupe(u8, e) catch @panic("failed to allocate failure");
+        if (actual) |a| new_failure.actual = self.allocator.dupe(u8, a) catch @panic("failed to allocate failure");
 
         self.failure = new_failure;
     }
@@ -56,24 +56,20 @@ pub const TestCaseResult = struct {
 
     pub fn printDetails(self: *const TestCaseResult, verbosity: Verbosity) !void {
         if (self.passed) {
-            if (verbosity >= .Info) {
-                try logging.log("  PASSED: {s}\n", .{self.name});
-            }
+            try logging.log(verbosity, "  PASSED: {s}\n", .{self.name});
         } else {
-            if (verbosity >= .Error) {
-                try logging.log("  FAILED: {s}\n", .{self.name});
-                if (self.failure) |f| {
-                    try logging.log("    Reason: {s}\n", .{f.reason});
-                    if (f.details) |d| try logging.log("    Details: {s}\n", .{d});
-                    if (f.expected) |e| try logging.log("    Expected: {s}\n", .{e});
-                    if (f.actual) |a| try logging.log("    Actual: {s}\n", .{a});
-                }
+            try logging.log(verbosity, "  FAILED: {s}", .{self.name});
+            if (self.failure) |f| {
+                try logging.log(verbosity, "    Reason: {s}", .{f.reason});
+                if (f.details) |d| try logging.log(verbosity, "    Details: {s}", .{d});
+                if (f.expected) |e| try logging.log(verbosity, "    Expected: {s}", .{e});
+                if (f.actual) |a| try logging.log(verbosity, "    Actual: {s}", .{a});
             }
         }
-        if (verbosity >= .Debug and self.measurements.items.len > 0) {
-            try logging.log("    Measurements:\n", .{});
+        if (self.measurements.items.len > 0) {
+            try logging.log(verbosity, "    Measurements:\n", .{});
             for (self.measurements.items) |m| {
-                try logging.log("      - Op: {s}, N: {d}, Time: {d}ns, Count: {d}\n", .{
+                try logging.log(verbosity, "      - Op: {s}, N: {d}, Time: {d}ns, Count: {d}", .{
                     m.operation, m.input_size_n, m.duration_ns, m.operations_count,
                 });
             }
@@ -114,29 +110,27 @@ pub const TestSuiteResult = struct {
         }
     }
 
-    pub fn printSummary(self: *const TestSuiteResult, verbosity: Verbosity) !void {
-        if (verbosity >= .Info) {
-            try logging.log("\n--- Test Suite Summary: {s} ---\n", .{self.name});
-            try logging.log("Total Test Cases Run: {d}\n", .{self.total_tests});
-            try logging.log("Passed: {d}\n", .{self.passed_tests});
-            try logging.log("Failed: {d}\n", .{self.failed_tests});
-        }
+    pub fn printSummary(self: *const TestSuiteResult) !void {
+        try logging.log(.Info, "\n--- Test Suite Summary: {s} ---\n", .{self.name});
+        try logging.log(.Info, "Total Test Cases Run: {d}\n", .{self.total_tests});
+        try logging.log(.Info, "Passed: {d}\n", .{self.passed_tests});
+        try logging.log(.Info, "Failed: {d}\n", .{self.failed_tests});
 
-        if (self.failed_tests > 0 and verbosity >= .Error) {
-            try logging.log("\nDetailed Failures for Suite '{s}':\n", .{self.name});
+        if (self.failed_tests > 0) {
+            try logging.log(.Debug, "\nDetailed Failures for Suite '{s}':\n", .{self.name});
             for (self.case_results.items) |result| {
                 if (!result.passed) {
-                    try result.printDetails(@max(verbosity, .Error));
-                } else if (verbosity >= .Debug) {
-                    try result.printDetails(verbosity);
+                    try result.printDetails(.Error);
+                } else {
+                    try result.printDetails(.Info);
                 }
             }
-        } else if (verbosity >= .Debug) {
-            try logging.log("\nDetails for Suite '{s}':\n", .{self.name});
+        } else {
+            try logging.log(.Info, "\nDetails for Suite '{s}':\n", .{self.name});
             for (self.case_results.items) |result| {
-                try result.printDetails(verbosity);
+                try result.printDetails(.Debug);
             }
         }
-        try logging.log("--- End Summary: {s} ---\n", .{self.name});
+        try logging.log(.Info,"--- End Summary: {s} ---\n", .{self.name});
     }
 };

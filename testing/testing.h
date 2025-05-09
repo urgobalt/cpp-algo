@@ -32,7 +32,6 @@ testingResultCode create_default(TrackedItemHandle *handle_out);
 testingResultCode create_value(int value, int order,
                                TrackedItemHandle *handle_out);
 testingResultCode destroy_tracked_item(TrackedItemHandle handle);
-testingResultCode get_data(TrackedItemHandle handle, CTrackedItem *item_out);
 /*--- Notifications for zig singleton---*/
 /** @brief Notifies Zig that a C++ TrackedItem was default constructed(Should
  * not happen). */
@@ -106,14 +105,14 @@ struct adtSimpleTestingOptions_s {
   Complexity expected_remove_complexity;
 };
 typedef struct adtSimpleTestingOptions_s adtSimpleTestingOptions;
-adtSimpleTestingOptions default_adtSimpleTestingOptions(char *name);
+adtSimpleTestingOptions default_adtSimpleTestingOptions(const char *name);
 // the pointer to the ADT in the operation
 typedef void *ADTHandle;
 
 /*--- Testing simple ADT Operations ---*/
 
 struct adtOperations_s {
-  testingResultCode (*insert)(ADTHandle handle, TrackedItemHandle value);
+  testingResultCode (*insert)(ADTHandle handle, CTrackedItem value);
   testingResultCode (*remove)(ADTHandle handle, TrackedItemHandle *value_out);
   testingResultCode (*peek)(ADTHandle handle, TrackedItemHandle *value_out);
   testingResultCode (*create)(
@@ -223,6 +222,10 @@ testingResultCode create_value(int value, int order,
   *handle_out = (new TrackedItem(value, order))->get_c();
   return ADT_RESULT_SUCCESS;
 };
+testingResultCode destroy_tracked_item(TrackedItemHandle handle){
+  delete handle;
+  return ADT_RESULT_SUCCESS;
+}
 inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
   os << obj.value;
   return os;
@@ -355,10 +358,6 @@ inline std::ostream &operator<<(std::ostream &os, const TrackedItem &obj) {
  * @param CPP_METHOD_NAME The name of the member function for remove (e.g.,
  * pop). This function must exist on CPP_TYPE and return a TrackedItem
  * (typically by value).
- * @warning Allocates memory for the output pointer (*value_out) using 'new'.
- * The CALLER IS RESPONSIBLE for freeing this memory using the corresponding
- * C API function (e.g., `destroy_tracked_item` or `free`)!
- * This is often an unsafe FFI pattern prone to memory leaks.
  * @warning Assumes the method throws std::out_of_range or similar if container
  * is empty.
  */

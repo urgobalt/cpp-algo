@@ -42,9 +42,15 @@ export fn test_test(_: *c.adtOperations) c_int {
 }
 
 export fn test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOptions) c_int {
+    internal_test_adt(c_adt_ops, c_options) catch |terr| {
+        return errors.testingErrorToCInt(terr);
+    };
+    return 0;
+}
+fn internal_test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOptions) TestingError!void {
     // here logging works as i want it to the rest is wrong
-    logging.log(.Info, "Starting ADT Testing Framework...\n", .{}) catch |err| {
-        return errors.testingErrorToCInt(err);
+    logging.log(.Info, "Starting ADT Testing Framework...\n", .{}) catch {
+        return error.Other;
     };
     const options = AdtSimpleTestingOptions.convert(c_options);
     const builder = ADTSimpleBuilder.init(c_adt_ops);
@@ -78,32 +84,21 @@ export fn test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOp
 
     try runner.addSuite(&test_adt_suite);
     var final_results = runner.runAll() catch |err| {
-        logging.log(.Error, "Test Runner CRASHED: {any}\n", .{err});
+        logging.log(.Error, "Test Runner CRASHED: {any}\n", .{err}) catch @panic("Failed to log about crash");
         if (gpa.deinit() == .leak) {
-            logging.print("Warning: Memory leak detected by GeneralPurposeAllocator after crash!\n", .{}) catch |terr| {
-                return errors.testingErrorToCInt(terr);
-            };
+            try logging.log(.Warning, "Memory leak detected by GeneralPurposeAllocator after crash!\n", .{});
         }
         return;
     };
     defer final_results.deinit();
 
-    final_results.printSummary(.Info) catch |terr| {
-        return errors.testingErrorToCInt(terr);
-    };
-
+    try final_results.printSummary();
     if (gpa.deinit() == .leak) {
-        try logging.log("Memory leak detected by GeneralPurposeAllocator at end of main!\n", .{}) catch |terr| {
-            return errors.testingErrorToCInt(terr);
-        };
+        try logging.log(.Warning, "Memory leak detected by GeneralPurposeAllocator at end of main!\n", .{});
     } else {
-        logging.log("GPA deinitialized successfully. No leaks reported by GPA.\n", .{}) catch |terr| {
-            return errors.testingErrorToCInt(terr);
-        };
+        try logging.log(.Warning, "GPA deinitialized successfully. No leaks reported by GPA.\n", .{});
     }
-    logging.log("ADT Testing Framework finished.\n", .{}) catch |terr| {
-        return errors.testingErrorToCInt(terr);
-    };
+    try logging.log(.Warning, "ADT Testing Framework finished.\n", .{});
 }
 export fn default_adtSimpleTestingOptions(name: [*c]u8) c.adtSimpleTestingOptions {
     const initial_values = [_]c_int{ 10, 50, 100, 200, 500, 1000, 2000, 5000, 10000 };

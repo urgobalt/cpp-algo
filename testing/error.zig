@@ -3,7 +3,7 @@ const std = @import("std");
 const c = @cImport({
     @cInclude("testing");
 });
-const logging = @import("logging.zig");
+
 pub const AdtError = error{
     NullPtr,
     Empty,
@@ -51,22 +51,22 @@ pub inline fn testingErrorToCInt(err: TestingError) c_int {
         AdtError.Alloc => c.ADT_RESULT_ERROR_ALLOC,
         AdtError.InvalidHandle => c.ADT_RESULT_ERROR_INVALID_HANDLE,
         AdtError.Other => c.ADT_RESULT_ERROR_OTHER,
-        else => c.ADT_RESULT_ERROR_OTHER,
+        else=>c.ADT_RESULT_ERROR_OTHER,
     };
 }
 
-pub fn formatError(err: anyerror) !void {
+pub fn formatError(err: anyerror, writer: anytype) !void {
     switch (err) {
-        AdtError.NullPtr => try logging.log(.Error, "AdtError.NullPtr", .{}),
-        AdtError.Empty => try logging.log(.Error, "AdtError.Empty", .{}),
-        AdtError.Alloc => try logging.log(.Error, "AdtError.Alloc", .{}),
-        AdtError.InvalidHandle => try logging.log(.Error, "AdtError.InvalidHandle", .{}),
-        AdtError.Other => try logging.log(.Error, "AdtError.Other", .{}),
-        FrameworkError.VerificationFailed => try logging.log(.Error, "FrameworkError.VerificationFailed", .{}),
-        FrameworkError.Timeout => try logging.log(.Error, "FrameworkError.Timeout", .{}),
-        FrameworkError.InvalidInputConfiguration => try logging.log(.Error, "FrameworkError.InvalidInputConfiguration", .{}),
-        FrameworkError.InputGenerationFailed => try logging.log(.Error, "FrameworkError.InputGenerationFailed", .{}),
-        FrameworkError.TestLogicError => try logging.log(.Error, "FrameworkError.TestLogicError", .{}),
-        else => try logging.log(.Error, "Unknown error: {any}", .{err}),
+        AdtError.NullPtr => try writer.writeAll("AdtError.NullPtr"),
+        AdtError.Empty => try writer.writeAll("AdtError.Empty"),
+        AdtError.Alloc => try writer.writeAll("AdtError.Alloc"),
+        AdtError.InvalidHandle => try writer.writeAll("AdtError.InvalidHandle"),
+        AdtError.Other => try writer.writeAll("AdtError.Other"),
+        FrameworkError.VerificationFailed => try writer.writeAll("FrameworkError.VerificationFailed"),
+        FrameworkError.Timeout => try writer.writeAll("FrameworkError.Timeout"),
+        FrameworkError.InvalidInputConfiguration => try writer.writeAll("FrameworkError.InvalidInputConfiguration"),
+        FrameworkError.InputGenerationFailed => try writer.writeAll("FrameworkError.InputGenerationFailed"),
+        FrameworkError.TestLogicError => try writer.writeAll("FrameworkError.TestLogicError"),
+        else => try writer.print("Unknown error: {any}", .{err}),
     }
 }

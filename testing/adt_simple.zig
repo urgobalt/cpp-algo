@@ -18,7 +18,8 @@ pub const ADTSimple = struct {
 
     pub fn insert(self: @This(), t: TrackingObject) !void {
         if (self.ops.insert == null) return errors.FrameworkError.TestLogicError;
-        const result_code = self.ops.insert.?(self.int_adt, t.backing);
+        const value: *c.CTrackedItem = @ptrCast(t.backing);
+        const result_code = self.ops.insert.?(self.int_adt, value.*);
         return errors.asTestingError(result_code);
     }
 
