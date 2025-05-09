@@ -7,6 +7,9 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const global_allocator = gpa.allocator();
 const tracking = @import("tracked_item.zig");
 const TrackingObject = tracking.TrackingObject;
+const InsertionOrder = adt_options.InsertionOrder;
+const Verbosity = adt_options.Verbosity;
+const Complexity = adt_options.Complexity;
 
 // In case of link errors because (maybe) dead code elimination
 comptime {
@@ -35,6 +38,7 @@ fn assert_eq(new_value: c_int, old_value: c_int) void {
 export fn test_test(_: *c.adtOperations) c_int {
     return -4;
     // beacuse we changed how testing works this is no longer the same, we should use the testing as done bellow.
+    // Do not remove, it broke production
 }
 
 export fn test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOptions) c_int {
@@ -53,22 +57,19 @@ export fn test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOp
     defer test_adt_suite.deinit();
 
     try test_adt_suite.addCaseConfig(.{
-        .name = options.name + "Basic Ops",
+        .name = std.mem.join(global_allocator, " ", &.{ options.name, "Basic Ops" }) catch @panic("global alloc go boom"),
         .order = options.order,
-        .input_type = .Sorted,
-        .input_sizes = &[_]u32{ 5, 10 },
+        .input_sizes = &[_]c_int{ 5, 10 },
     });
     try test_adt_suite.addCaseConfig(.{
-        .name = options.name + "Empty Input",
+        .name = std.mem.join(gpa.allocator(), " ", &.{ options.name, "Empty Input" }) catch @panic("global alloc go boom"),
         .order = options.order,
-        .input_type = .Empty,
-        .input_sizes = &[_]u32{0},
+        .input_sizes = &[_]c_int{0},
     });
     try test_adt_suite.addCaseConfig(.{
-        .name = options.name + "Random Input",
+        .name = std.mem.join(gpa.allocator(), " ", &.{ options.name, "Random Input" }) catch @panic("global alloc go boom"),
         .order = options.order,
-        .input_type = .RandomUniqueValues,
-        .input_sizes = &[_]u32{8},
+        .input_sizes = &[_]c_int{8},
         .estimate_complexity = true,
     });
 
@@ -92,34 +93,33 @@ export fn test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTestingOp
     };
 
     if (gpa.deinit() == .leak) {
-        try logging.log("Memory leak detected by GeneralPurposeAllocator at end of main!\n", .{} catch |terr| {
+        try logging.log("Memory leak detected by GeneralPurposeAllocator at end of main!\n", .{}) catch |terr| {
             return errors.testingErrorToCInt(terr);
-        });
+        };
     } else {
-        logging.log("GPA deinitialized successfully. No leaks reported by GPA.\n", .{} catch |terr| {
+        logging.log("GPA deinitialized successfully. No leaks reported by GPA.\n", .{}) catch |terr| {
             return errors.testingErrorToCInt(terr);
-        });
+        };
     }
-    logging.log("ADT Testing Framework finished.\n", .{} catch |terr| {
+    logging.log("ADT Testing Framework finished.\n", .{}) catch |terr| {
         return errors.testingErrorToCInt(terr);
-    });
+    };
 }
 export fn default_adtSimpleTestingOptions(name: [*c]u8) c.adtSimpleTestingOptions {
     const initial_values = [_]c_int{ 10, 50, 100, 200, 500, 1000, 2000, 5000, 10000 };
     const defaultSizes = std.heap.c_allocator.dupe(c_int, &initial_values) catch |err| {
-        std.debug.print("Invalid alloc {}", err);
-        std.process.abort();
+        std.debug.panic("C allocator hit the fan: {any}", .{err});
     };
     return .{
         .name = name,
-        .verbosity = @intFromEnum(.Error),
-        .order = @intFromEnum(.Unknown),
+        .verbosity = @intFromEnum(Verbosity.Error),
+        .order = @intFromEnum(InsertionOrder.Unknown),
         .sorted_output = true,
         .input_sizes = @ptrCast(defaultSizes.ptr),
         .input_sizes_size = 9,
         .estimate_complexity = true,
-        .expected_insert_complexity = @intFromEnum(.None),
-        .expected_peek_complexity = @intFromEnum(.None),
-        .expected_remove_complexity = @intFromEnum(.None),
+        .expected_insert_complexity = @intFromEnum(Complexity.None),
+        .expected_peek_complexity = @intFromEnum(Complexity.None),
+        .expected_remove_complexity = @intFromEnum(Complexity.None),
     };
 }

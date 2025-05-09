@@ -42,7 +42,7 @@ pub const AdtSimpleTestingOptions = struct {
     verbosity: Verbosity = .Info,
     order: InsertionOrder = .Unknown,
     expected_output_sorted_by_value: bool = false,
-    input_sizes: []const u32 = &[_]u32{ 10, 100 },
+    input_sizes: []const c_int,
     prng_seed: u64 = 0,
     estimate_complexity: bool = false,
     max_operations_for_timing: u32 = 10000,
@@ -63,11 +63,11 @@ pub const AdtSimpleTestingOptions = struct {
             .verbosity = @enumFromInt(options.verbosity),
             .order = @enumFromInt(options.order),
             .expected_output_sorted_by_value = options.sorted_output,
-            .input_sizes = input_sizes,
+            .input_sizes = input_sizes orelse &[_]c_int{ 10, 100 },
             .estimate_complexity = options.estimate_complexity,
             .expected_insert_complexity = @enumFromInt(options.expected_insert_complexity),
             .expected_peek_complexity = @enumFromInt(options.expected_peek_complexity),
-            .expected_remove_complexity= @enumFromInt(options.expected_remove_complexity),
+            .expected_remove_complexity = @enumFromInt(options.expected_remove_complexity),
         };
     }
 };
