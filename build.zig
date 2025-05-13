@@ -38,15 +38,30 @@ pub fn build(b: *std.Build) !void {
     };
 
     const a1 = cpp_binaries.create_cpp_exe("a1", b.path("./src/a1.cc"));
+    const b1 = cpp_binaries.create_cpp_exe("b1", b.path("./src/b1.cc"));
     const b2 = cpp_binaries.create_cpp_exe("b2", b.path("./src/b2.cc"));
+    const c1 = cpp_binaries.create_cpp_exe("c1", b.path("./src/c1.cc"));
+    //b1
+    b1.linkLibrary(testing_lib);
+    b1.step.dependOn(&header_file.step);
+    b1.step.dependOn(&impl_header_files.step);
+    b1.addIncludePath(b.path("zig-out/include"));
+    //b2
     b2.linkLibrary(testing_lib);
     b2.step.dependOn(&header_file.step);
     b2.step.dependOn(&impl_header_files.step);
     b2.addIncludePath(b.path("zig-out/include"));
 
+    //c1
+    c1.linkLibrary(testing_lib);
+    c1.step.dependOn(&header_file.step);
+    c1.step.dependOn(&impl_header_files.step);
+    c1.addIncludePath(b.path("zig-out/include"));
     const run = b.step("run", "Run all the binaries built");
     run.dependOn(&b.addRunArtifact(a1).step);
+    run.dependOn(&b.addRunArtifact(b1).step);
     run.dependOn(&b.addRunArtifact(b2).step);
+    run.dependOn(&b.addRunArtifact(c1).step);
 }
 
 const CppBinaries = struct {

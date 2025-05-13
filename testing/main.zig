@@ -63,17 +63,17 @@ fn internal_test_adt(c_adt_ops: *c.adtOperations, c_options: *c.adtSimpleTesting
     defer test_adt_suite.deinit();
 
     try test_adt_suite.addCaseConfig(.{
-        .name = std.mem.join(global_allocator, " ", &.{ options.name, "Basic Ops" }) catch @panic("global alloc go boom"),
+        .name = std.mem.concat(global_allocator, u8, &.{ options.name, "Basic Ops" }) catch @panic("global alloc go boom"),
         .order = options.order,
         .input_sizes = &[_]c_int{ 5, 10 },
     });
     try test_adt_suite.addCaseConfig(.{
-        .name = std.mem.join(gpa.allocator(), " ", &.{ options.name, "Empty Input" }) catch @panic("global alloc go boom"),
+        .name = std.mem.concat(gpa.allocator(), u8, &.{ options.name, "Empty Input" }) catch @panic("global alloc go boom"),
         .order = options.order,
         .input_sizes = &[_]c_int{0},
     });
     try test_adt_suite.addCaseConfig(.{
-        .name = std.mem.join(gpa.allocator(), " ", &.{ options.name, "Random Input" }) catch @panic("global alloc go boom"),
+        .name = std.mem.concat(gpa.allocator(), u8, &.{ options.name, "Random Input" }) catch @panic("global alloc go boom"),
         .order = options.order,
         .input_sizes = &[_]c_int{8},
         .estimate_complexity = true,

@@ -15,7 +15,7 @@ const Allocator = std.mem.Allocator;
 const Verbosity = testing_types.Verbosity;
 const InsertionOrder = testing_types.InsertionOrder;
 const Complexity = testing_types.Complexity;
-const TestInputType=@import("input_generators.zig").TestInputType;
+const TestInputType = @import("input_generators.zig").TestInputType;
 pub const TestOptions = struct {
     name: []const u8 = "Unnamed ADT Test Case",
     verbosity: Verbosity = .Info,
@@ -32,9 +32,6 @@ pub const TestOptions = struct {
     num_iterations: u32 = 1,
     timeout_ms: ?u64 = 5000,
     fail_fast: bool = false,
-    pub fn deinit()void{
-        // ig do stuff here
-    }
 };
 pub const TestSuiteOptions = struct {
     verbosity: Verbosity = .Info,
@@ -67,7 +64,7 @@ pub const TestSuite = struct {
 
     pub fn deinit(self: *TestSuite) void {
         for (self.test_case_configs.items) |*config| {
-            _ = config;
+            self.allocator.destroy(config);
         }
         self.test_case_configs.deinit();
     }
@@ -100,6 +97,9 @@ pub const TestRunner = struct {
     }
 
     pub fn deinit(self: *TestRunner) void {
+        for (self.suites_to_run.items) |value| {
+            value.deinit();
+        }
         self.suites_to_run.deinit();
     }
 
